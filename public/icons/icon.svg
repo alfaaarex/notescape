@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Notescape">
+  <rect width="512" height="512" rx="116" fill="#09090b"/>
+  <rect x="108" y="92" width="296" height="328" rx="36" fill="#f4f4f5"/>
+  <rect x="148" y="144" width="216" height="22" rx="11" fill="#18181b"/>
+  <rect x="148" y="200" width="168" height="18" rx="9" fill="#52525b"/>
+  <rect x="148" y="246" width="216" height="18" rx="9" fill="#71717a"/>
+  <rect x="148" y="292" width="132" height="18" rx="9" fill="#71717a"/>
+  <path d="M341 420l63-63v63h-63z" fill="#d4d4d8"/>
+</svg>
