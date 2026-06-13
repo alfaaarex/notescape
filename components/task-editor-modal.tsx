@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Flag, Tag, FileText, Loader2 } from 'lucide-react';
+import { X, Calendar, Flag, Tag, FileText, Loader2, Clock, RotateCw } from 'lucide-react';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 import {
   PRIORITY_LABELS,
@@ -25,6 +25,7 @@ interface TaskEditorModalProps {
 
 const PRIORITIES: TaskPriority[] = ['high', 'medium', 'low', 'none'];
 const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done', 'cancelled'];
+const MODES: ('deadline' | 'timeBox' | 'floating')[] = ['deadline', 'timeBox', 'floating'];
 
 export function TaskEditorModal({
   open,
@@ -40,7 +41,13 @@ export function TaskEditorModal({
   const [priority, setPriority] = useState<TaskPriority>('none');
   const [status, setStatus] = useState<TaskStatus>('todo');
   const [colorTag, setColorTag] = useState('sky');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(''); // For deadline and floating
+  const [dueTime, setDueTime] = useState(''); // For deadline only
+  const [mode, setMode] = useState<'deadline' | 'timeBox' | 'floating'>('deadline');
+  // Time Box fields
+  const [startDate, setStartDate] = useState(''); // ISO date
+  const [startTime, setStartTime] = useState(''); // HH:mm
+  const [duration, setDuration] = useState(0); // in minutes
   const [linkedNoteId, setLinkedNoteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -51,7 +58,26 @@ export function TaskEditorModal({
       setPriority(task.priority);
       setStatus(task.status);
       setColorTag(task.colorTag);
-      setDueDate(task.dueDate ?? '');
+      // Determine mode from task
+      if (task.mode === 'timeBox') {
+        setMode('timeBox');
+        // Assuming task.start is ISO datetime string
+        if (task.start) {
+          const start = new Date(task.start);
+          setStartDate(start.toISOString().split('T')[0]);
+          setStartTime(start.toTimeString().slice(0, 5));
+        }
+        setDuration(task.duration ?? 0);
+      } else if (task.mode === 'floating') {
+        setMode('floating');
+        setDueDate(task.dueDate ?? '');
+        setDueTime(''); // Floating tasks have no time
+      } else {
+        // deadline mode
+        setMode('deadline');
+        setDueDate(task.dueDate ?? '');
+        setDueTime(task.dueTime ?? '');
+      }
       setLinkedNoteId(task.linkedNoteId);
     } else if (nlpPrefill) {
       setTitle(nlpPrefill.title);
@@ -59,7 +85,26 @@ export function TaskEditorModal({
       setPriority(nlpPrefill.priority);
       setStatus(nlpPrefill.status);
       setColorTag(nlpPrefill.colorTag);
-      setDueDate(nlpPrefill.dueDate ?? '');
+      // Assume nlpPrefill provides mode? We'll default to deadline
+      setMode(nlpPrefill.mode ?? 'deadline');
+      if (nlpPrefill.mode === 'timeBox') {
+        if (nlpPrefill.start) {
+          const start = new Date(nlpPrefill.start);
+          setStartDate(start.toISOString().split('T')[0]);
+          setStartTime(start.toTimeString().slice(0, 5));
+        }
+        setDuration(nlpPrefill.duration ?? 0);
+        setDueDate('');
+        setDueTime('');
+      } else if (nlpPrefill.mode === 'floating') {
+        setMode('floating');
+        setDueDate(nlpPrefill.dueDate ?? '');
+        setDueTime('');
+      } else {
+        setMode('deadline');
+        setDueDate(nlpPrefill.dueDate ?? '');
+        setDueTime(nlpPrefill.dueTime ?? '');
+      }
       setLinkedNoteId(null);
     } else {
       setTitle('');
@@ -67,7 +112,12 @@ export function TaskEditorModal({
       setPriority('none');
       setStatus('todo');
       setColorTag('sky');
+      setMode('deadline');
       setDueDate(prefillDate ?? '');
+      setDueTime('');
+      setStartDate('');
+      setStartTime('');
+      setDuration(0);
       setLinkedNoteId(null);
     }
   }, [task, nlpPrefill, open, prefillDate]);
@@ -77,18 +127,36 @@ export function TaskEditorModal({
     if (!title.trim()) return;
     setSaving(true);
     try {
-      await onSave({
+      const taskData: Task = {
         id: task?.id ?? crypto.randomUUID(),
         title: title.trim(),
         description,
         priority,
         status,
         colorTag,
-        dueDate: dueDate || null,
+        mode,
+        // Fields based on mode
+        ...(mode === 'timeBox' ? {
+          start: `${startDate}T${startTime}:00`, // ISO datetime
+          duration,
+          dueDate: null,
+          dueTime: null,
+        } : mode === 'floating' ? {
+          start: null,
+          duration: 0,
+          dueDate: dueDate || null,
+          dueTime: null,
+        } : {
+          start: null,
+          duration: 0,
+          dueDate: dueDate || null,
+          dueTime: dueTime || null,
+        }),
         linkedNoteId,
         createdAt: task?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
-      });
+      };
+      await onSave(taskData);
       onClose();
     } finally {
       setSaving(false);
@@ -115,7 +183,7 @@ export function TaskEditorModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.97 }}
             transition={{ type: 'spring', damping: 28, stiffness: 380 }}
-            className="fixed inset-x-4 top-[10%] z-50 mx-auto max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 border border-gray-100 dark:border-zinc-700"
+            className="fixed inset-x-4 top-[10%] z-50 mx-auto max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-zinc-900 border border-gray-100 dark:border-zinc-700"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-zinc-800">
@@ -125,7 +193,7 @@ export function TaskEditorModal({
                 </h2>
                 {nlpPrefill && !task && (
                   <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 15l-5 3.2 1.9-5.8L4 8.8h6.1z"/></svg>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 15l-5 3.2 1.9-5.8L4 8.8h6.1z" /></svg>
                     AI filled
                   </span>
                 )}
@@ -159,37 +227,140 @@ export function TaskEditorModal({
                 className="w-full text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 rounded-xl p-3 border-none outline-none placeholder:text-gray-300 dark:placeholder:text-zinc-600 resize-none leading-relaxed"
               />
 
-              {/* Metadata Row */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Priority */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    <Flag size={12} />
-                    Priority
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PRIORITIES.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPriority(p)}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                          priority === p
-                            ? 'text-white shadow-sm'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
-                        }`}
-                        style={
-                          priority === p
-                            ? { backgroundColor: PRIORITY_COLORS[p] }
-                            : {}
-                        }
-                      >
-                        {PRIORITY_LABELS[p]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Mode Selector */}
+              <div className="flex gap-4 rounded-lg bg-gray-50 dark:bg-zinc-800/50 p-3">
+                {MODES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-all ${mode === m
+                      ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 bg-transparent'}`}
+                  >
+                    {m === 'deadline' && (
+                      <>
+                        <Calendar size={14} />
+                        <span className="hidden sm:inline">Deadline</span>
+                      </>
+                    )}
+                    {m === 'timeBox' && (
+                      <>
+                        <RotateCw size={14} />
+                        <span className="hidden sm:inline">Time Box</span>
+                      </>
+                    )}
+                    {m === 'floating' && (
+                      <>
+                        <Calendar size={14} />
+                        <span className="hidden sm:inline">Floating</span>
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
 
+              {/* Conditional fields based on mode */}
+              {mode === 'deadline' && (
+                <>
+                  {/* Due Date */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <Calendar size={12} />
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none"
+                    />
+                  </div>
+
+                  {/* Due Time */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <Clock size={12} />
+                      Due Time
+                    </label>
+                    <input
+                      type="time"
+                      value={dueTime}
+                      onChange={(e) => setDueTime(e.target.value)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none [color-scheme:light] dark:[color-scheme:dark]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {mode === 'timeBox' && (
+                <>
+                  {/* Start Date */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <Calendar size={12} />
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none"
+                    />
+                  </div>
+
+                  {/* Start Time */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <Clock size={12} />
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none [color-scheme:light] dark:[color-scheme:dark]"
+                    />
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <RotateCw size={12} />
+                      Duration (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={duration}
+                      onChange={(e) => setDuration(Number(e.target.value) || 0)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none"
+                      min="1"
+                      step="15"
+                    />
+                  </div>
+                </>
+              )}
+
+              {mode === 'floating' && (
+                <>
+                  {/* Due Date (no time) */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <Calendar size={12} />
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Grid 1: Timelines & Status (only for deadline and timeBox? we put status always) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Status */}
                 <div>
                   <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
@@ -209,18 +380,32 @@ export function TaskEditorModal({
                   </select>
                 </div>
 
-                {/* Due Date */}
+                {/* Priority */}
                 <div>
                   <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    <Calendar size={12} />
-                    Due Date
+                    <Flag size={12} />
+                    Priority
                   </label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full text-sm bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-none outline-none"
-                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRIORITIES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${priority === p
+                          ? 'text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                          }`}
+                        style={
+                          priority === p
+                            ? { backgroundColor: PRIORITY_COLORS[p] }
+                            : {}
+                        }
+                      >
+                        {PRIORITY_LABELS[p]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Color Tag */}

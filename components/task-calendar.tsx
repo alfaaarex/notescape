@@ -15,6 +15,7 @@ import {
   XCircle,
   CalendarCheck,
   TrendingUp,
+  RotateCw,
 } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { PRIORITY_COLORS, TASK_COLOR_OPTIONS, STATUS_LABELS } from '@/lib/types';
@@ -31,7 +32,7 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-const DAYS_LONG  = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAYS_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function toISO(year: number, month: number, day: number) {
@@ -44,18 +45,45 @@ function getColorHex(task: Task) {
   return TASK_COLOR_OPTIONS.find((c) => c.value === task.colorTag)?.hex ?? PRIORITY_COLORS[task.priority];
 }
 
+function getDeadlineColor(task: Task): string {
+  // Only for deadline mode
+  if (task.mode !== 'deadline' || !task.dueDate) return getColorHex(task); // fallback to task color
+
+  const dueDateTime = task.dueTime
+    ? new Date(`${task.dueDate}T${task.dueTime}:00`)
+    : new Date(`${task.dueDate}T00:00:00`);
+
+  const now = new Date();
+  const diffMs = dueDateTime.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffHours < 0) {
+    // Overdue
+    return '#ef4444'; // red-500
+  } else if (diffHours < 1) {
+    // Less than 1 hour
+    return '#f97316'; // orange-500
+  } else if (diffHours < 24) {
+    // Less than 24 hours
+    return '#eab308'; // yellow-500
+  } else {
+    // More than 24 hours
+    return '#10b981'; // emerald-500
+  }
+}
+
 function StatusIcon({ status }: { status: Task['status'] }) {
-  if (status === 'done')        return <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />;
+  if (status === 'done') return <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />;
   if (status === 'in_progress') return <Clock size={13} className="text-amber-400 flex-shrink-0" />;
-  if (status === 'cancelled')   return <XCircle size={13} className="text-red-400 flex-shrink-0" />;
+  if (status === 'cancelled') return <XCircle size={13} className="text-red-400 flex-shrink-0" />;
   return <Circle size={13} className="text-gray-300 flex-shrink-0" />;
 }
 
 // ─── Stats Bar ───────────────────────────────────────────────────────────────
 function StatsBar({ tasks }: { tasks: Task[] }) {
-  const done       = tasks.filter((t) => t.status === 'done').length;
+  const done = tasks.filter((t) => t.status === 'done').length;
   const inProgress = tasks.filter((t) => t.status === 'in_progress').length;
-  const overdue    = tasks.filter((t) => {
+  const overdue = tasks.filter((t) => {
     if (!t.dueDate || t.status === 'done' || t.status === 'cancelled') return false;
     return new Date(t.dueDate + 'T00:00:00') < new Date(new Date().toDateString());
   }).length;
@@ -64,10 +92,10 @@ function StatsBar({ tasks }: { tasks: Task[] }) {
 
   return (
     <div className="flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-zinc-800 overflow-x-auto flex-shrink-0">
-      <Stat icon={<CalendarCheck size={14} className="text-emerald-500" />} label="Done"        value={done}       color="text-emerald-600 dark:text-emerald-400" />
-      <Stat icon={<Clock size={14} className="text-amber-500" />}          label="In progress"  value={inProgress} color="text-amber-600 dark:text-amber-400" />
-      <Stat icon={<TrendingUp size={14} className="text-red-400" />}       label="Overdue"      value={overdue}    color="text-red-600 dark:text-red-400" />
-      <Stat icon={<CalendarDays size={14} className="text-gray-400" />}    label="Total"        value={total}      color="text-gray-600 dark:text-gray-400" />
+      <Stat icon={<CalendarCheck size={14} className="text-emerald-500" />} label="Done" value={done} color="text-emerald-600 dark:text-emerald-400" />
+      <Stat icon={<Clock size={14} className="text-amber-500" />} label="In progress" value={inProgress} color="text-amber-600 dark:text-amber-400" />
+      <Stat icon={<TrendingUp size={14} className="text-red-400" />} label="Overdue" value={overdue} color="text-red-600 dark:text-red-400" />
+      <Stat icon={<CalendarDays size={14} className="text-gray-400" />} label="Total" value={total} color="text-gray-600 dark:text-gray-400" />
       {total > 0 && (
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{pct}%</span>
@@ -112,7 +140,7 @@ function MonthView({
   }, {}), [tasks]);
 
   const daysInMonth = getDaysInMonth(year, month);
-  const firstDay    = getFirstDayOfMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
 
   return (
     <AnimatePresence mode="wait" custom={direction}>
@@ -139,7 +167,7 @@ function MonthView({
             const day = i + 1;
             const iso = toISO(year, month, day);
             const dayTasks = tasksByDate[iso] ?? [];
-            const isToday    = iso === todayISO;
+            const isToday = iso === todayISO;
             const isSelected = selectedDay === iso;
             const hasOverdue = dayTasks.some((t) =>
               t.status !== 'done' && t.status !== 'cancelled' && iso < todayISO
@@ -149,33 +177,51 @@ function MonthView({
               <button
                 key={iso}
                 onClick={() => onSelectDay(iso)}
-                className={`group relative flex flex-col items-center rounded-xl p-1 sm:p-1.5 min-h-[52px] sm:min-h-[72px] transition-all duration-150 border ${
-                  isSelected
+                className={`group relative flex flex-col items-center rounded-xl p-1 sm:p-1.5 min-h-[52px] sm:min-h-[72px] transition-all duration-150 border ${isSelected
                     ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white shadow-md'
                     : isToday
-                    ? 'bg-indigo-50 dark:bg-indigo-900/25 border-indigo-200 dark:border-indigo-700'
-                    : hasOverdue
-                    ? 'border-red-100 dark:border-red-900/30 hover:bg-red-50/50 dark:hover:bg-red-900/10'
-                    : 'border-transparent hover:bg-gray-50 dark:hover:bg-zinc-800/70'
-                }`}
+                      ? 'bg-indigo-50 dark:bg-indigo-900/25 border-indigo-200 dark:border-indigo-700'
+                      : hasOverdue
+                        ? 'border-red-100 dark:border-red-900/30 hover:bg-red-50/50 dark:hover:bg-red-900/10'
+                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-zinc-800/70'
+                  }`}
               >
-                <span className={`text-[11px] sm:text-xs font-bold w-5 sm:w-6 h-5 sm:h-6 flex items-center justify-center rounded-full ${
-                  isSelected ? 'text-white dark:text-gray-900'
-                  : isToday  ? 'text-indigo-600 dark:text-indigo-400'
-                  :             'text-gray-600 dark:text-gray-400'
-                }`}>
+                <span className={`text-[11px] sm:text-xs font-bold w-5 sm:w-6 h-5 sm:h-6 flex items-center justify-center rounded-full ${isSelected ? 'text-white dark:text-gray-900'
+                    : isToday ? 'text-indigo-600 dark:text-indigo-400'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}>
                   {day}
                 </span>
 
-                {/* Task dots */}
+                {/* Task dots with mode-specific styling */}
                 <div className="flex flex-wrap gap-0.5 justify-center mt-0.5 px-0.5">
-                  {dayTasks.slice(0, 3).map((t) => (
-                    <span
-                      key={t.id}
-                      className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: getColorHex(t) }}
-                    />
-                  ))}
+                  {dayTasks.slice(0, 3).map((t, index) => {
+                    // Determine the color based on mode and deadline proximity
+                    let bgColor = getColorHex(t);
+                    if (t.mode === 'deadline') {
+                      bgColor = getDeadlineColor(t);
+                    } else if (t.mode === 'timeBox') {
+                      bgColor = '#8b5cf6'; // violet-500 for time box
+                    } else if (t.mode === 'floating') {
+                      bgColor = '#6366f1'; // indigo-500 for floating
+                    }
+
+                    return (
+                      <span
+                        key={`${t.id}-${index}`}
+                        className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0 transition-all duration-200"
+                        style={{ backgroundColor: bgColor }}
+                      >
+                        {/* Mode indicator */}
+                        {t.mode === 'timeBox' && (
+                          <RotateCw size={8} className="absolute -top-1 -left-1 text-white/[0.8] scale-75" />
+                        )}
+                        {t.mode === 'floating' && (
+                          <CalendarDays size={8} className="absolute -top-1 -left-1 text-white/[0.8] scale-75" />
+                        )}
+                      </span>
+                    );
+                  })}
                   {dayTasks.length > 3 && (
                     <span className="text-[8px] sm:text-[9px] text-gray-400 leading-none">+{dayTasks.length - 3}</span>
                   )}
@@ -229,25 +275,23 @@ function WeekView({
     <div className="flex gap-1 sm:gap-2 h-full">
       {weekDays.map(({ iso, day, dayName }) => {
         const dayTasks = tasksByDate[iso] ?? [];
-        const isToday    = iso === todayISO;
+        const isToday = iso === todayISO;
         const isSelected = selectedDay === iso;
         return (
           <div
             key={iso}
-            className={`flex-1 flex flex-col rounded-xl border transition-all ${
-              isSelected ? 'border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/15' :
-              isToday    ? 'border-indigo-200 dark:border-indigo-800' :
-                           'border-gray-100 dark:border-zinc-800'
-            }`}
+            className={`flex-1 flex flex-col rounded-xl border transition-all ${isSelected ? 'border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/15' :
+                isToday ? 'border-indigo-200 dark:border-indigo-800' :
+                  'border-gray-100 dark:border-zinc-800'
+              }`}
           >
             <button
               onClick={() => onSelectDay(iso)}
               className="flex flex-col items-center py-2 sm:py-3"
             >
               <span className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase">{dayName}</span>
-              <span className={`mt-0.5 text-sm sm:text-base font-bold ${
-                isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'
-              }`}>{day}</span>
+              <span className={`mt-0.5 text-sm sm:text-base font-bold ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'
+                }`}>{day}</span>
             </button>
             <div className="flex-1 overflow-y-auto px-1 pb-2 flex flex-col gap-1">
               {dayTasks.map((task) => (
@@ -261,7 +305,25 @@ function WeekView({
                     borderLeft: `3px solid ${getColorHex(task)}`,
                   }}
                 >
-                  {task.title}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="truncate">{task.title}</span>
+                    {task.dueTime && (
+                      <span className="text-[8px] font-bold opacity-75 flex items-center gap-0.5">
+                        <Clock size={8} /> {task.dueTime}
+                      </span>
+                    )}
+                    {/* Mode indicator for week view */}
+                    {task.mode === 'timeBox' && (
+                      <span className="text-[8px] font-bold opacity-75 flex items-center gap-0.5 ml-2">
+                        <RotateCw size={8} />
+                      </span>
+                    )}
+                    {task.mode === 'floating' && (
+                      <span className="text-[8px] font-bold opacity-75 flex items-center gap-0.5 ml-2">
+                        <CalendarDays size={8} />
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
               <button
@@ -315,16 +377,15 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
       {grouped.dates.map((iso) => {
         const d = new Date(iso + 'T00:00:00');
         const isToday = iso === todayISO;
-        const isPast  = iso < todayISO;
+        const isPast = iso < todayISO;
         return (
           <div key={iso} className="mb-2">
-            <div className={`sticky top-0 flex items-center gap-3 px-4 sm:px-6 py-2 text-xs font-bold uppercase tracking-widest z-10 ${
-              isToday
+            <div className={`sticky top-0 flex items-center gap-3 px-4 sm:px-6 py-2 text-xs font-bold uppercase tracking-widest z-10 ${isToday
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-900/20 backdrop-blur-sm'
                 : isPast
-                ? 'text-red-400 bg-red-50/60 dark:bg-red-900/10 backdrop-blur-sm'
-                : 'text-gray-500 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm'
-            }`}>
+                  ? 'text-red-400 bg-red-50/60 dark:bg-red-900/10 backdrop-blur-sm'
+                  : 'text-gray-500 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm'
+              }`}>
               <span>{isToday ? 'Today · ' : ''}{d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
               <span className="ml-auto font-normal normal-case text-gray-400 dark:text-zinc-500">{grouped.map[iso].length} task{grouped.map[iso].length !== 1 ? 's' : ''}</span>
             </div>
@@ -344,9 +405,28 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
                     <p className={`text-sm font-medium truncate ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>
                       {task.title}
                     </p>
-                    {task.description && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{task.description}</p>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {task.dueTime && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 flex-shrink-0">
+                          <Clock size={10} />
+                          {task.dueTime}
+                        </span>
+                      )}
+                      {task.description && (
+                        <p className="text-xs text-gray-400 truncate">{task.description}</p>
+                      )}
+                      {/* Mode indicator */}
+                      {task.mode === 'timeBox' && (
+                        <span className="text-xs font-bold opacity-75 flex items-center gap-1 ml-2">
+                          <RotateCw size={10} />
+                        </span>
+                      )}
+                      {task.mode === 'floating' && (
+                        <span className="text-xs font-bold opacity-75 flex items-center gap-1 ml-2">
+                          <CalendarDays size={10} />
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="text-[11px] font-medium text-gray-400 dark:text-zinc-500 flex-shrink-0">
                     {STATUS_LABELS[task.status]}
@@ -404,7 +484,7 @@ function DayPanel({
       animate={{ width: 272, opacity: 1 }}
       exit={{ width: 0, opacity: 0 }}
       transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-      className="border-l border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden flex flex-col flex-shrink-0"
+      className="border-l border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-y-auto flex flex-col flex-shrink-0"
     >
       <div className="min-w-[272px] h-full flex flex-col p-4">
         <div className="flex items-start justify-between mb-4">
@@ -449,24 +529,57 @@ function DayPanel({
           >
             {selectedTasks.map((task) => {
               const hex = getColorHex(task);
+              let bgColor = hex + '18';
+              let borderColor = `3px solid ${hex}`;
+              if (task.mode === 'deadline') {
+                bgColor = getDeadlineColor(task) + '18';
+                borderColor = `3px solid ${getDeadlineColor(task)}`;
+              } else if (task.mode === 'timeBox') {
+                bgColor = '#8b5cf618'; // violet-500 with 10% opacity
+                borderColor = '3px solid #8b5cf6';
+              } else if (task.mode === 'floating') {
+                bgColor = '#6366f118'; // indigo-500 with 10% opacity
+                borderColor = '3px solid #6366f1';
+              }
               return (
                 <motion.button
                   key={task.id}
                   variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
                   onClick={() => onEditTask(task)}
                   className="text-left flex items-start gap-2.5 p-3 rounded-xl transition-colors hover:opacity-90 group"
-                  style={{ backgroundColor: hex + '18', borderLeft: `3px solid ${hex}` }}
+                  style={{ backgroundColor: bgColor, borderLeft: borderColor }}
                 >
                   <StatusIcon status={task.status} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-semibold leading-snug ${task.status === 'done' ? 'line-through opacity-50' : 'text-gray-800 dark:text-gray-200'}`}>
                       {task.title}
                     </p>
-                    {task.priority !== 'none' && (
-                      <p className="text-[10px] mt-0.5 font-medium capitalize" style={{ color: PRIORITY_COLORS[task.priority] }}>
-                        {task.priority} priority
-                      </p>
-                    )}
+                    <div className="flex items-center flex-wrap gap-1.5 mt-1">
+                      {task.dueTime && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-tight text-gray-500 dark:text-zinc-400 bg-white/60 dark:bg-zinc-950/40 px-1 rounded">
+                          <Clock size={9} />
+                          {task.dueTime}
+                        </span>
+                      )}
+                      {task.priority !== 'none' && (
+                        <p className="text-[10px] font-medium capitalize" style={{ color: PRIORITY_COLORS[task.priority] }}>
+                          {task.priority}
+                        </p>
+                      )}
+                      {/* Mode badge */}
+                      {task.mode === 'timeBox' && (
+                        <span className="text-[9px] font-bold opacity-75 flex items-center gap-2">
+                          <RotateCw size={10} className="mr-1" />
+                          Time Box
+                        </span>
+                      )}
+                      {task.mode === 'floating' && (
+                        <span className="text-[9px] font-bold opacity-75 flex items-center gap-2">
+                          <CalendarDays size={10} className="mr-1" />
+                            Floating
+                          </span>
+                      )}
+                    </div>
                   </div>
                 </motion.button>
               );
@@ -481,10 +594,10 @@ function DayPanel({
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps) {
   const now = new Date();
-  const [year, setYear]         = useState(now.getFullYear());
-  const [month, setMonth]       = useState(now.getMonth());
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [calView, setCalView]   = useState<CalView>('month');
+  const [calView, setCalView] = useState<CalView>('month');
   const [direction, setDirection] = useState(1);
 
   const todayISO = toISO(now.getFullYear(), now.getMonth(), now.getDate());
@@ -512,8 +625,8 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
   }, {}), [tasks]);
 
   const VIEW_ICONS: Record<CalView, React.ReactNode> = {
-    month:  <LayoutGrid size={14} />,
-    week:   <CalendarDays size={14} />,
+    month: <LayoutGrid size={14} />,
+    week: <CalendarDays size={14} />,
     agenda: <List size={14} />,
   };
 
@@ -562,11 +675,10 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
             <button
               key={v}
               onClick={() => setCalView(v)}
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
-                calView === v
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${calView === v
                   ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               {VIEW_ICONS[v]}
               <span className="hidden sm:inline">{v}</span>
@@ -668,26 +780,58 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
                 </button>
               </div>
             </div>
-            <div className="overflow-y-auto px-4 pb-6 flex flex-col gap-2">
+            <div className="flex-1 overflow-y-auto px-4 pb-6 flex flex-col gap-2">
               {(tasksByDate[selectedDay] ?? []).length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6">No tasks for this day</p>
               ) : (
                 (tasksByDate[selectedDay] ?? []).map((task) => {
                   const hex = getColorHex(task);
+                  let bgColor = hex + '18';
+                  let borderColor = `3px solid ${hex}`;
+                  if (task.mode === 'deadline') {
+                    bgColor = getDeadlineColor(task) + '18';
+                    borderColor = `3px solid ${getDeadlineColor(token)}`;
+                  } else if (task.mode === 'timeBox') {
+                    bgColor = '#8b5cf618'; // violet-500 with 10% opacity
+                    borderColor = '3px solid #8b5cf6';
+                  } else if (task.mode === 'floating') {
+                    bgColor = '#6366f118'; // indigo-500 with 10% opacity
+                    borderColor = '3px solid #6366f1';
+                  }
                   return (
                     <button
                       key={task.id}
                       onClick={() => onEditTask(task)}
                       className="text-left flex items-center gap-3 p-3.5 rounded-2xl"
-                      style={{ backgroundColor: hex + '18', borderLeft: `3px solid ${hex}` }}
+                      style={{ backgroundColor: bgColor, borderLeft: borderColor }}
                     >
                       <StatusIcon status={task.status} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{task.title}</p>
-                        {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {task.dueTime && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 flex-shrink-0">
+                              <Clock size={10} /> {task.dueTime}
+                            </span>
+                          )}
+                          {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
+                          {/* Mode badge */}
+                          {task.mode === 'timeBox' && (
+                            <span className="text-xs font-bold opacity-75 flex items-center gap-1">
+                              <RotateCw size={10} className="mr-1" />
+                              Time Box
+                            </span>
+                          )}
+                          {task.mode === 'floating' && (
+                            <span className="text-xs font-bold opacity-75 flex items-center gap-1">
+                              <CalendarDays size={10} className="mr-1" />
+                              Floating
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
-                  );
+                  )
                 })
               )}
             </div>
