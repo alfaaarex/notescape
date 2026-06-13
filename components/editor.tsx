@@ -174,25 +174,83 @@ const getLinePrefix = (content: string, cursor: number) => {
 
 const estimateReadingTime = (wordCount: number) => Math.max(1, Math.ceil(wordCount / 220));
 
+// Render inline markdown: bold, italic, code, strikethrough, links
+const renderInline = (text: string): React.ReactNode[] => {
+  const parts: React.ReactNode[] = [];
+  // Pattern order matters: code first (to avoid processing its contents), then links, then bold+italic combos
+  const pattern = /(`[^`]+`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|\[([^\]]+)\]\(([^)]+)\))/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let idx = 0;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) parts.push(<span key={`t-${idx++}`}>{text.slice(last, match.index)}</span>);
+    const m = match[0];
+    if (m.startsWith('`')) {
+      parts.push(<code key={`c-${idx++}`} className="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm text-rose-600 dark:bg-zinc-800 dark:text-rose-400">{m.slice(1, -1)}</code>);
+    } else if (m.startsWith('***')) {
+      parts.push(<strong key={`bi-${idx++}`} className="font-bold italic">{match[2]}</strong>);
+    } else if (m.startsWith('**')) {
+      parts.push(<strong key={`b-${idx++}`} className="font-semibold text-gray-900 dark:text-zinc-100">{match[3]}</strong>);
+    } else if (m.startsWith('*')) {
+      parts.push(<em key={`i-${idx++}`} className="italic">{match[4]}</em>);
+    } else if (m.startsWith('~~')) {
+      parts.push(<s key={`s-${idx++}`} className="line-through text-gray-400 dark:text-zinc-500">{match[5]}</s>);
+    } else if (m.startsWith('[')) {
+      parts.push(<a key={`a-${idx++}`} href={match[7]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 dark:text-blue-400">{match[6]}</a>);
+    }
+    last = match.index + m.length;
+  }
+  if (last < text.length) parts.push(<span key={`t-${idx++}`}>{text.slice(last)}</span>);
+  return parts;
+};
+
 const renderPreview = (text: string) => {
   if (!text.trim()) {
     return <p className="text-gray-400 dark:text-zinc-500">Nothing to preview yet.</p>;
   }
 
-  return text.split('\n').map((line, index) => {
-    const key = `${index}-${line}`;
-    if (line.startsWith('# ')) return <h1 key={key} className="mt-6 first:mt-0 text-3xl font-bold text-gray-950 dark:text-zinc-50">{line.slice(2)}</h1>;
-    if (line.startsWith('## ')) return <h2 key={key} className="mt-5 text-2xl font-bold text-gray-900 dark:text-zinc-100">{line.slice(3)}</h2>;
-    if (line.startsWith('### ')) return <h3 key={key} className="mt-4 text-xl font-semibold text-gray-900 dark:text-zinc-100">{line.slice(4)}</h3>;
-    if (line.startsWith('- [ ] ')) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300"><span className="mr-2 inline-block h-4 w-4 rounded border border-gray-300 align-[-2px] dark:border-zinc-600" />{line.slice(6)}</p>;
-    if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) return <p key={key} className="my-2 text-gray-500 line-through dark:text-zinc-500"><span className="mr-2 inline-block h-4 w-4 rounded bg-gray-800 align-[-2px] dark:bg-zinc-200" />{line.slice(6)}</p>;
-    if (line.startsWith('- ')) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300"><span className="mr-2">-</span>{line.slice(2)}</p>;
-    if (/^\d+\.\s/.test(line)) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{line}</p>;
-    if (line.startsWith('> ')) return <blockquote key={key} className="my-3 border-l-2 border-gray-300 pl-4 text-gray-600 italic dark:border-zinc-700 dark:text-zinc-400">{line.slice(2)}</blockquote>;
-    if (line === '---') return <hr key={key} className="my-6 border-gray-200 dark:border-zinc-800" />;
-    if (!line.trim()) return <div key={key} className="h-4" />;
-    return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{line}</p>;
-  });
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const key = `${i}-${line.slice(0, 20)}`;
+
+    // Fenced code blocks
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <pre key={key} className="my-4 overflow-x-auto rounded-xl bg-gray-950 px-5 py-4 text-sm leading-relaxed dark:bg-zinc-900">
+          <code className={`text-gray-100 font-mono ${lang ? `language-${lang}` : ''}`}>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      i++;
+      continue;
+    }
+
+    if (line.startsWith('# ')) { elements.push(<h1 key={key} className="mt-7 first:mt-0 text-3xl font-bold text-gray-950 dark:text-zinc-50">{renderInline(line.slice(2))}</h1>); }
+    else if (line.startsWith('## ')) { elements.push(<h2 key={key} className="mt-6 text-2xl font-bold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(3))}</h2>); }
+    else if (line.startsWith('### ')) { elements.push(<h3 key={key} className="mt-5 text-xl font-semibold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(4))}</h3>); }
+    else if (line.startsWith('- [ ] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-1 inline-block h-4 w-4 flex-shrink-0 rounded border border-gray-300 dark:border-zinc-600" /><span>{renderInline(line.slice(6))}</span></p>); }
+    else if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-500 dark:text-zinc-500"><span className="mt-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-gray-800 dark:bg-zinc-200"><svg viewBox="0 0 10 10" className="h-2.5 w-2.5 text-white dark:text-zinc-900" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span><span className="line-through">{renderInline(line.slice(6))}</span></p>); }
+    else if (line.startsWith('- ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-zinc-500" /><span>{renderInline(line.slice(2))}</span></p>); }
+    else if (/^\d+\.\s/.test(line)) { elements.push(<p key={key} className="my-1.5 text-gray-700 dark:text-zinc-300">{renderInline(line)}</p>); }
+    else if (line.startsWith('> ')) { elements.push(<blockquote key={key} className="my-3 border-l-2 border-indigo-300 pl-4 text-gray-600 italic dark:border-indigo-700 dark:text-zinc-400">{renderInline(line.slice(2))}</blockquote>); }
+    else if (line === '---') { elements.push(<hr key={key} className="my-6 border-gray-200 dark:border-zinc-800" />); }
+    else if (!line.trim()) { elements.push(<div key={key} className="h-3" />); }
+    else { elements.push(<p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{renderInline(line)}</p>); }
+
+    i++;
+  }
+
+  return elements;
 };
 
 export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorProps) => {
@@ -225,12 +283,14 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
       setPinned(note.pinned ?? false);
       noteIdRef.current = note.id;
     } else {
+      // Generate a fresh ID immediately so a new note never inherits
+      // the previous note's ID (which would cause content to be copied).
+      noteIdRef.current = crypto.randomUUID();
       setTitle('');
       setContent('');
       setColor('alabaster');
       setTags([]);
       setPinned(false);
-      noteIdRef.current = crypto.randomUUID();
     }
     setSaveStatus('idle');
     setSlashOpen(false);
@@ -451,7 +511,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
 
           <button
             onClick={() => setPreviewOpen((open) => !open)}
-            className={`hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors sm:flex ${previewOpen ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${previewOpen ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
           >
             {previewOpen ? <EyeOff size={14} /> : <Eye size={14} />}
             Preview
@@ -621,7 +681,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
                 animate={{ width: 380, opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                className="hidden min-w-0 border-l border-black/5 bg-white/65 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/70 lg:block"
+                className="min-w-0 border-l border-black/5 bg-white/65 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/70"
               >
                 <div className="flex h-14 items-center gap-2 border-b border-black/5 px-4 text-sm font-semibold text-gray-700 dark:border-white/10 dark:text-zinc-300">
                   <PanelRight size={16} />

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notescape-v1';
+const CACHE_NAME = 'notescape-v2';
 const APP_SHELL = [
   '/',
   '/login',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   '/icons/icon-512.svg',
 ];
 
+// ── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
@@ -18,15 +19,19 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// ── Activate ─────────────────────────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+      )
       .then(() => self.clients.claim()),
   );
 });
 
+// ── Fetch (cache strategy) ───────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -64,5 +69,64 @@ self.addEventListener('fetch', (event) => {
         });
       }),
     );
+  }
+});
+
+// ── Push Notifications ───────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  let data = { title: 'Notescape', body: "You have a new notification.", icon: '/icons/icon-192.svg', badge: '/icons/icon-192.svg' };
+
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch {
+      data.body = event.data.text();
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon,
+      badge: data.badge,
+      tag: data.tag || 'notescape-notification',
+      renotify: true,
+      data: { url: data.url || '/' },
+    }),
+  );
+});
+
+// ── Notification Click ────────────────────────────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url === targetUrl && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    }),
+  );
+});
+
+// ── Background Sync (optional task reminders) ────────────────────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SCHEDULE_NOTIFICATION') {
+    const { title, body, delay = 0, url = '/' } = event.data.payload;
+    setTimeout(() => {
+      self.registration.showNotification(title, {
+        body,
+        icon: '/icons/icon-192.svg',
+        badge: '/icons/icon-192.svg',
+        tag: 'notescape-scheduled',
+        data: { url },
+      });
+    }, delay);
   }
 });

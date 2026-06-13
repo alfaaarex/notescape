@@ -15,6 +15,7 @@ import { TaskCalendar } from '@/components/task-calendar';
 import { TaskEditorModal } from '@/components/task-editor-modal';
 import { CommandPalette } from '@/components/command-palette';
 import { SettingsModal } from '@/components/settings-modal';
+import { NotificationBanner } from '@/components/notification-banner';
 import { Menu, X } from 'lucide-react';
 
 export default function Home() {
@@ -114,7 +115,7 @@ export default function Home() {
         {/* ── Sidebar ── */}
         {/* Desktop: always visible. Mobile: slide-in drawer. */}
         <div className={`
-          fixed md:relative z-40 md:z-auto h-full
+          fixed top-0 left-0 md:relative z-40 md:z-auto h-full overflow-hidden
           transition-transform duration-300 ease-in-out
           ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}>
@@ -135,7 +136,7 @@ export default function Home() {
         </div>
 
         {/* ── Main content ── */}
-        <main className="flex-1 overflow-hidden relative flex flex-col bg-white dark:bg-zinc-900">
+        <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-white dark:bg-zinc-900">
           {/* Mobile top bar */}
           <div className="flex md:hidden items-center h-12 px-4 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0">
             <button
@@ -252,6 +253,8 @@ export default function Home() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      <NotificationBanner />
     </>
   );
 }
