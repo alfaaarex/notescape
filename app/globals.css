@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -46,11 +46,6 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-  --color-alabaster: #F9F9F6;
-  --color-sage: #EEF2EE;
-  --color-linen: #FDF8F5;
-  --color-slate: #F0F1F4;
-  --color-lavender: #F3EFFF;
 }
 
 :root {
@@ -86,7 +81,22 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Global accent — default indigo */
+  --ns-accent:       #6366f1;
+  --ns-accent-light: #eef2ff;
+  --ns-accent-mid:   #a5b4fc;
+  --ns-accent-dark:  #4338ca;
+  --ns-accent-muted: rgba(99,102,241,0.12);
 }
+
+/* Accent themes */
+html[data-accent="indigo"]  { --ns-accent:#6366f1; --ns-accent-light:#eef2ff; --ns-accent-mid:#a5b4fc; --ns-accent-dark:#4338ca; --ns-accent-muted:rgba(99,102,241,0.12); }
+html[data-accent="violet"]  { --ns-accent:#8b5cf6; --ns-accent-light:#f5f3ff; --ns-accent-mid:#c4b5fd; --ns-accent-dark:#6d28d9; --ns-accent-muted:rgba(139,92,246,0.12); }
+html[data-accent="rose"]    { --ns-accent:#f43f5e; --ns-accent-light:#fff1f2; --ns-accent-mid:#fda4af; --ns-accent-dark:#be123c; --ns-accent-muted:rgba(244,63,94,0.12); }
+html[data-accent="amber"]   { --ns-accent:#f59e0b; --ns-accent-light:#fffbeb; --ns-accent-mid:#fcd34d; --ns-accent-dark:#b45309; --ns-accent-muted:rgba(245,158,11,0.12); }
+html[data-accent="emerald"] { --ns-accent:#10b981; --ns-accent-light:#ecfdf5; --ns-accent-mid:#6ee7b7; --ns-accent-dark:#065f46; --ns-accent-muted:rgba(16,185,129,0.12); }
+html[data-accent="sky"]     { --ns-accent:#0ea5e9; --ns-accent-light:#f0f9ff; --ns-accent-mid:#7dd3fc; --ns-accent-dark:#075985; --ns-accent-muted:rgba(14,165,233,0.12); }
 
 .dark {
   --background: oklch(0.145 0 0);
@@ -123,33 +133,36 @@
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-    box-sizing: border-box;
-  }
-  body {
-    @apply bg-background text-foreground;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  html {
-    @apply font-sans;
-    scroll-behavior: smooth;
-  }
-  ::selection {
-    background-color: #e0e7ff;
-    color: #3730a3;
-  }
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
+  * { @apply border-border outline-ring/50; box-sizing: border-box; }
+  body { @apply bg-background text-foreground; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html { @apply font-sans; scroll-behavior: smooth; }
+  ::selection { background-color: var(--ns-accent-light); color: var(--ns-accent-dark); }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: oklch(0.85 0 0);
-    border-radius: 10px;
-  }
-  .dark ::-webkit-scrollbar-thumb {
-    background: oklch(0.3 0 0);
-  }
+  ::-webkit-scrollbar-thumb { background: oklch(0.85 0 0); border-radius: 10px; }
+  .dark ::-webkit-scrollbar-thumb { background: oklch(0.3 0 0); }
 }
+
+/* Accent utilities */
+.ns-accent-bg       { background-color: var(--ns-accent); }
+.ns-accent-text     { color: var(--ns-accent); }
+.ns-accent-light-bg { background-color: var(--ns-accent-light); }
+.ns-accent-muted-bg { background-color: var(--ns-accent-muted); }
+.ns-accent-border   { border-color: var(--ns-accent); }
+.ns-accent-ring     { box-shadow: 0 0 0 2px var(--ns-accent); }
+
+/* Focus mode */
+.focus-mode-active .toolbar-panel { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+.focus-mode-active:hover .toolbar-panel { opacity: 1; pointer-events: auto; }
+
+/* Editor font modes */
+.editor-font-serif textarea, .editor-font-serif input[type="text"] { font-family:'Georgia','Times New Roman',serif; font-size:18px; line-height:1.9; }
+.editor-font-mono  textarea, .editor-font-mono  input[type="text"] { font-family:var(--font-geist-mono),'Courier New',monospace; font-size:15px; line-height:1.8; }
+
+/* Animated empty state keyframes */
+@keyframes float-up-down { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes sparkle-pop   { 0%,100%{transform:scale(1) rotate(0deg);opacity:.7} 50%{transform:scale(1.35) rotate(18deg);opacity:1} }
+@keyframes ring-pulse    { 0%,100%{transform:scale(1);opacity:.4} 50%{transform:scale(1.1);opacity:.12} }
+.animate-float   { animation: float-up-down 3s ease-in-out infinite; }
+.animate-sparkle { animation: sparkle-pop 2.2s ease-in-out infinite; }
+.animate-ring    { animation: ring-pulse 2.6s ease-in-out infinite; }

@@ -1,171 +1,95 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Note } from './types';
-import { supabase } from './supabaseClient';
-import { useAuth } from '@/components/auth-provider';
 
-export type { Note };
+// Define the Note interface
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  color: string;
+  summary?: string;
+  updatedAt: number; // timestamp
+}
 
-const STORAGE_KEY = 'notescape-notes';
+// Storage key for localStorage
+const STORAGE_KEY = 'notes-app-notes';
 
+// Simulated async service for localStorage
 export const useNotes = () => {
-  const { user } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Load notes
+  // Load notes from localStorage on mount
   useEffect(() => {
-    const fetchNotes = async () => {
-      setLoading(true);
-      if (user) {
+    const loadNotes = async () => {
+      // Check if we're on the client (to avoid SSR issues)
+      if (typeof window !== 'undefined') {
         try {
-          const { data, error } = await supabase
-            .from('notes')
-            .select('*')
-            .order('updated_at', { ascending: false });
-
-          if (error) {
-            console.error('Error fetching notes from Supabase:', error);
-          } else if (data) {
-            // Map table fields to Note interface
-            const mapped: Note[] = data.map((n: any) => ({
-              id: n.id,
-              title: n.title,
-              content: n.content,
-              color: n.color,
-              summary: n.summary,
-              tags: n.tags || [],
-              pinned: n.pinned || false,
-              updatedAt: n.updated_at,
-            }));
-            setNotes(mapped);
-          }
-        } catch (err) {
-          console.error('Failed to load notes from Supabase:', err);
-        }
-      } else {
-        // Fall back to local storage
-        if (typeof window !== 'undefined') {
-          try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            const parsed: Note[] = stored ? JSON.parse(stored) : [];
-            const migrated = parsed.map((n) => ({
-              ...n,
-              tags: n.tags ?? [],
-              pinned: n.pinned ?? false,
-            }));
-            setNotes(migrated);
-          } catch {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setNotes(parsed);
+          } else {
             setNotes([]);
           }
+        } catch (error) {
+          console.error('Failed to load notes from localStorage:', error);
+          setNotes([]);
         }
       }
       setLoading(false);
     };
 
-    fetchNotes();
-  }, [user]);
+    loadNotes();
+  }, []);
 
-  // Persist locally
-  const persistLocal = useCallback((updated: Note[]) => {
+  // Save notes to localStorage
+  const saveNotes = useCallback(async (updatedNotes: Note[]) => {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        console.error('Failed to save notes to local storage');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedNotes));
+        setNotes(updatedNotes);
+      } catch (error) {
+        console.error('Failed to save notes to localStorage:', error);
       }
     }
   }, []);
 
-  const saveNote = useCallback(
-    async (note: Note) => {
-      // Update state first for instant UX feel
-      setNotes((prev) => {
-        const idx = prev.findIndex((n) => n.id === note.id);
-        const next = [...prev];
-        if (idx >= 0) next[idx] = note;
-        else next.push(note);
-        if (!user) {
-          persistLocal(next);
-        }
-        return next;
-      });
+  // Get all notes
+  const getNotes = useCallback(async (): Promise<Note[]> => {
+    // Return a copy of the current state
+    return [...notes];
+  }, [notes]);
 
-      // Sync with Supabase
-      if (user) {
-        const { error } = await supabase.from('notes').upsert({
-          id: note.id,
-          user_id: user.id,
-          title: note.title,
-          content: note.content,
-          color: note.color,
-          summary: note.summary || null,
-          tags: note.tags,
-          pinned: note.pinned,
-          updated_at: note.updatedAt,
-        });
-
-        if (error) {
-          console.error('Error saving note to Supabase:', error);
-          throw error;
-        }
+  // Save a single note (create or update)
+  const saveNote = useCallback(async (note: Note) => {
+    setNotes(prev => {
+      const existingIndex = prev.findIndex(n => n.id === note.id);
+      const updatedNotes = [...prev];
+      if (existingIndex >= 0) {
+        updatedNotes[existingIndex] = note;
+      } else {
+        updatedNotes.push(note);
       }
-    },
-    [user, persistLocal],
-  );
+      // Persist to localStorage
+      saveNotes(updatedNotes);
+      return updatedNotes;
+    });
+  }, [saveNotes]);
 
-  const deleteNote = useCallback(
-    async (id: string) => {
-      setNotes((prev) => {
-        const next = prev.filter((n) => n.id !== id);
-        if (!user) {
-          persistLocal(next);
-        }
-        return next;
-      });
+  // Delete a note by ID
+  const deleteNote = useCallback(async (id: string) => {
+    setNotes(prev => {
+      const updatedNotes = prev.filter(note => note.id !== id);
+      saveNotes(updatedNotes);
+      return updatedNotes;
+    });
+  }, [saveNotes]);
 
-      if (user) {
-        const { error } = await supabase.from('notes').delete().eq('id', id);
-        if (error) {
-          console.error('Error deleting note from Supabase:', error);
-          throw error;
-        }
-      }
-    },
-    [user, persistLocal],
-  );
-
-  const togglePin = useCallback(
-    async (id: string) => {
-      let updatedNote: Note | undefined;
-
-      setNotes((prev) => {
-        const next = prev.map((n) => {
-          if (n.id === id) {
-            updatedNote = { ...n, pinned: !n.pinned, updatedAt: Date.now() };
-            return updatedNote;
-          }
-          return n;
-        });
-        if (!user) {
-          persistLocal(next);
-        }
-        return next;
-      });
-
-      if (user && updatedNote) {
-        const { error } = await supabase
-          .from('notes')
-          .update({ pinned: updatedNote.pinned, updated_at: updatedNote.updatedAt })
-          .eq('id', id);
-
-        if (error) {
-          console.error('Error toggling pin in Supabase:', error);
-          throw error;
-        }
-      }
-    },
-    [user, persistLocal],
-  );
-
-  return { notes, loading, saveNote, deleteNote, togglePin };
+  return {
+    notes,
+    loading,
+    getNotes,
+    saveNote,
+    deleteNote,
+  };
 };

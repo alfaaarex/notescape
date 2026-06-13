@@ -1,272 +1,53 @@
-'use client';
-
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  FileText,
-  CheckSquare,
-  CalendarDays,
-  Plus,
-  Search,
-  Command,
-  Pin,
-  LogOut,
-} from 'lucide-react';
-import type { Note } from '@/lib/storage';
-import { ThemeToggle } from './theme-toggle';
-import { useAuth } from '@/components/auth-provider';
-
-export type SidebarView = 'notes' | 'tasks' | 'calendar';
+import { Note } from '../lib/storage';
 
 interface SidebarProps {
   notes: Note[];
-  activeView: SidebarView;
-  selectedNoteId: string | null;
-  onSelectNote: (note: Note) => void;
+  onSelectNote: (note: Note | null) => void;
   onCreateNote: () => void;
-  onChangeView: (view: SidebarView) => void;
-  onOpenCommand: () => void;
-  onOpenSettings?: () => void;
 }
 
-const NAV_ITEMS: Array<{ id: SidebarView; label: string; icon: React.ReactNode }> = [
-  { id: 'notes', label: 'Notes', icon: <FileText size={16} /> },
-  { id: 'tasks', label: 'Tasks', icon: <CheckSquare size={16} /> },
-  { id: 'calendar', label: 'Calendar', icon: <CalendarDays size={16} /> },
-];
+export const Sidebar = ({ notes, onSelectNote, onCreateNote }: SidebarProps) => {
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
-};
-const item = {
-  hidden: { opacity: 0, x: -8 },
-  show: { opacity: 1, x: 0 },
-};
+  const handleSelectNote = (note: Note) => {
+    setSelectedNoteId(note.id);
+    onSelectNote(note);
+  };
 
-export function Sidebar({
-  notes,
-  activeView,
-  selectedNoteId,
-  onSelectNote,
-  onCreateNote,
-  onChangeView,
-  onOpenCommand,
-  onOpenSettings,
-}: SidebarProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const { user, signOut } = useAuth();
-  const userName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  const userEmail = user?.email || '';
-  const initials = userName
-    .split(' ')
-    .map((n: string) => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
-
-  const pinnedNotes = notes.filter((n) => n.pinned);
-  const unpinnedNotes = notes.filter((n) => !n.pinned);
-
-  const filteredNotes =
-    searchQuery.trim()
-      ? notes.filter(
-          (n) =>
-            n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            n.content.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-      : null;
-
-  const notesToRender = filteredNotes ?? unpinnedNotes;
+  const handleCreateNote = () => {
+    setSelectedNoteId(null);
+    onSelectNote(null);
+    onCreateNote();
+  };
 
   return (
-    <aside className="w-60 bg-[#f7f7f5] dark:bg-zinc-950 border-r border-gray-200/60 dark:border-zinc-800 flex flex-col">
-      {/* Logo + Command Button */}
-      <div className="flex h-14 items-center justify-between px-4">
-        <span className="text-[13px] font-bold tracking-widest text-gray-400 dark:text-zinc-500 uppercase select-none">
-          Notescape
-        </span>
+    <aside className="w-64 bg-white border-r border-gray-200">
+      <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
+        <h2 className="text-lg font-medium text-gray-800">Notes</h2>
         <button
-          onClick={onOpenCommand}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 dark:text-zinc-500 hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors text-[11px]"
-          title="Open Command Palette (Cmd+K)"
+          onClick={handleCreateNote}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-500"
         >
-          <Command size={11} />
-          <span>K</span>
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
         </button>
       </div>
-
-      {/* Search */}
-      <div className="px-3 mb-3">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-200/60 dark:bg-zinc-800 text-gray-400">
-          <Search size={13} className="flex-shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search..."
-            className="flex-1 bg-transparent text-xs text-gray-600 dark:text-gray-400 placeholder:text-gray-400 dark:placeholder:text-zinc-600 border-none outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Nav */}
-      <div className="px-2 mb-4 flex flex-col gap-0.5">
-        {NAV_ITEMS.map((nav) => (
+      <nav className="mt-2 space-y-1">
+        {notes.map((note) => (
           <button
-            key={nav.id}
-            onClick={() => onChangeView(nav.id)}
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-              activeView === nav.id
-                ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900/60 hover:text-gray-700 dark:hover:text-zinc-300'
-            }`}
+            key={note.id}
+            onClick={() => handleSelectNote(note)}
+            className={`flex w-full items-center px-3 py-2 text-left text-sm font-medium transition-colors ${selectedNoteId === note.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            {nav.icon}
-            {nav.label}
+            <div className="flex-1 truncate">{note.title || 'Untitled'}</div>
+            <span className="ml-3 text-xs text-gray-400">
+              {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+            </span>
           </button>
         ))}
-      </div>
-
-      {/* Notes List */}
-      {activeView === 'notes' && (
-        <>
-          <div className="flex items-center justify-between px-4 mb-2">
-            <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
-              {searchQuery ? 'Results' : 'Notes'}
-            </span>
-            <button
-              onClick={onCreateNote}
-              className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-              aria-label="New note"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-2 pb-4">
-            <motion.div
-              className="flex flex-col gap-0.5"
-              variants={container}
-              initial="hidden"
-              animate="show"
-              key={searchQuery}
-            >
-              {/* Pinned */}
-              {!searchQuery && pinnedNotes.length > 0 && (
-                <>
-                  <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-zinc-600 uppercase tracking-wider">
-                    <Pin size={9} />
-                    Pinned
-                  </div>
-                  {pinnedNotes.map((note) => (
-                    <NoteLink
-                      key={note.id}
-                      note={note}
-                      isSelected={selectedNoteId === note.id}
-                      onClick={() => onSelectNote(note)}
-                    />
-                  ))}
-                  <div className="h-px bg-gray-200/80 dark:bg-zinc-800 mx-3 my-1" />
-                </>
-              )}
-
-              {/* All / Filtered notes */}
-              {notesToRender.map((note) => (
-                <NoteLink
-                  key={note.id}
-                  note={note}
-                  isSelected={selectedNoteId === note.id}
-                  onClick={() => onSelectNote(note)}
-                />
-              ))}
-
-              {notesToRender.length === 0 && (
-                <p className="px-3 py-6 text-xs text-gray-400 text-center">
-                  {searchQuery ? 'No notes found' : 'No notes yet'}
-                </p>
-              )}
-            </motion.div>
-          </div>
-        </>
-      )}
-
-      {activeView !== 'notes' && <div className="flex-1" />}
-
-      {/* User Profile Section */}
-      {user && (
-        <div 
-          onClick={onOpenSettings}
-          className="px-3 py-2 border-t border-gray-200/60 dark:border-zinc-800 flex items-center justify-between gap-2 bg-gray-50/50 dark:bg-zinc-900/10 hover:bg-gray-200/50 dark:hover:bg-zinc-900/40 cursor-pointer transition-colors duration-150"
-        >
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-full bg-zinc-950 dark:bg-zinc-100 border border-zinc-200/10 flex items-center justify-center text-zinc-100 dark:text-zinc-950 text-[10px] font-semibold select-none flex-shrink-0 overflow-hidden">
-              {user?.user_metadata?.avatar_url ? (
-                <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-medium text-gray-700 dark:text-zinc-200 truncate">
-                {userName}
-              </span>
-              <span className="text-[9px] text-gray-400 dark:text-zinc-500 truncate">
-                {userEmail}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); signOut(); }}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 hover:bg-gray-200/60 dark:hover:bg-zinc-900 transition-all active:scale-95"
-            title="Sign Out"
-          >
-            <LogOut size={12} />
-          </button>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200/60 dark:border-zinc-800">
-        <span className="text-[10px] font-medium text-gray-400 dark:text-zinc-600">
-          {notes.length} notes
-        </span>
-        <ThemeToggle />
-      </div>
+      </nav>
     </aside>
   );
-}
-
-function NoteLink({
-  note,
-  isSelected,
-  onClick,
-}: {
-  note: Note;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const COLOR_HEX: Record<string, string> = {
-    alabaster: '#F9F9F6', sage: '#EEF2EE', linen: '#FDF8F5',
-    slate: '#F0F1F4', lavender: '#F3EFFF',
-  };
-  const dotColor = COLOR_HEX[note.color] ?? '#e5e7eb';
-
-  return (
-    <motion.button
-      variants={item}
-      onClick={onClick}
-      className={`flex w-full items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 ${
-        isSelected
-          ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 shadow-sm'
-          : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900/60 hover:text-gray-700 dark:hover:text-zinc-200'
-      }`}
-    >
-      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-black/5" style={{ backgroundColor: dotColor }} />
-      <span className="flex-1 text-xs font-medium truncate">
-        {note.title || 'Untitled'}
-      </span>
-      {note.pinned && <Pin size={9} className="flex-shrink-0 text-gray-400" />}
-    </motion.button>
-  );
-}
+};
