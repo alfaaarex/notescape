@@ -103,6 +103,8 @@ Parse the user's input sentence and match it perfectly to one of these three tas
 
 Extraction rules:
 - title: clear task action, excluding metadata phrasing like "urgent", "due tomorrow", or "for 30 mins".
+- description: secondary contextual details if any, otherwise an empty string.
+- status: always infer "todo" as the default base status.
 - priority: "urgent"/"critical"/"asap" -> high; "soon" -> medium; "whenever" -> low; else -> none.
 - colorTag: infer from task domain (coding/bugs -> rose; reviews/deadlines -> amber; features -> emerald; docs/admin -> sky; design -> violet; else -> slate).
 - dueDate: parse into tokens like "today", "tomorrow", day names like "monday", or null.
@@ -134,34 +136,27 @@ Extraction rules:
     };
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_XAI_API_KEY;
-      if (!apiKey) throw new Error("xAI API key is missing from environment variables.");
-
-      const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      // Routed through your local Next.js secure endpoint to avoid CORS blocks and secure the secret key
+      const response = await fetch('/api/parse-task', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'grok-2-1212', // Can change to 'grok-beta' if preferred
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: trimmed }
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: jsonSchema
-          },
-          temperature: 0.1,
+          userInput: trimmed,
+          systemPrompt,
+          jsonSchema,
         }),
       });
 
-      if (!response.ok) throw new Error(`xAI API error ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server proxy error: ${errorText}`);
+      }
 
       const data = await response.json();
       const textOutput = data.choices?.[0]?.message?.content;
-      if (!textOutput) throw new Error("Received an empty response text payload from xAI.");
+      if (!textOutput) throw new Error("Received an empty response text payload from xAI endpoint.");
 
       const parsed = JSON.parse(textOutput);
 
