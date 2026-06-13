@@ -12,7 +12,11 @@ export interface NlpParsedTask {
   priority: TaskPriority;
   status: TaskStatus;
   dueDate: string | null;
+  dueTime?: string | null;
   colorTag: string;
+  mode: 'deadline' | 'timeBox' | 'floating';
+  start?: string | null;
+  duration?: number;
 }
 
 interface NlpTaskInputProps {
@@ -20,11 +24,11 @@ interface NlpTaskInputProps {
 }
 
 const EXAMPLES = [
-  'Fix login bug high priority due tomorrow',
+  'Study physics for 45 mins at 4 PM tomorrow',
+  'Fix login bug high priority due by 3 PM Friday',
   'Review PR medium priority next Friday',
-  'Write tests for auth module due next week',
+  'Read calculus module when I have time',
   'Deploy to staging today urgent',
-  'Update docs low priority no due date',
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,18 +44,12 @@ function offsetISO(days: number) {
 }
 
 function nextWeekdayISO(weekday: number) {
-  // weekday: 0=Sun … 6=Sat
   const d = new Date();
   const diff = (weekday - d.getDay() + 7) % 7 || 7;
   d.setDate(d.getDate() + diff);
   return d.toISOString().slice(0, 10);
 }
 
-/**
- * Resolve relative date tokens the model might emit to real ISO dates.
- * The model returns tokens like "today", "tomorrow", "next monday", etc.
- * We convert them so the modal gets a concrete YYYY-MM-DD string.
- */
 function resolveDate(raw: string | null): string | null {
   if (!raw) return null;
   const s = raw.toLowerCase().trim();
@@ -68,7 +66,6 @@ function resolveDate(raw: string | null): string | null {
   if (nextDayMatch && days[nextDayMatch[1]] !== undefined) {
     return nextWeekdayISO(days[nextDayMatch[1]]);
   }
-  // If it already looks like ISO (YYYY-MM-DD), pass through
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   return null;
 }
@@ -97,66 +94,116 @@ export function NlpTaskInput({ onParsed }: NlpTaskInputProps) {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     });
 
-    const systemPrompt = `You are a task parser. Today is ${today}.
-Extract structured task data from the user's natural language input.
-Return ONLY a valid JSON object — no markdown fences, no prose, nothing else.
+    const systemPrompt = `You are an expert task extraction assistant. Today is ${today}.
+Parse the user's input sentence and match it perfectly to one of these three task modes:
 
-JSON shape:
-{
-  "title": string,          // concise action title
-  "description": string,    // optional extra detail (empty string if none)
-  "priority": "high" | "medium" | "low" | "none",
-  "status": "todo" | "in_progress" | "done" | "cancelled",
-  "dueDate": string | null, // "today" / "tomorrow" / "YYYY-MM-DD" / "next monday" / null
-  "colorTag": "rose" | "amber" | "emerald" | "sky" | "violet" | "slate"
-}
+1. "timeBox": When a specific length/duration or an exact starting timeline block is explicitly stated (e.g., "for 45 minutes", "1 hour session at 4pm").
+2. "floating": When the task is open-ended without any date constraints or expressions indicating casual pacing (e.g., "when I get around to it", "someday").
+3. "deadline": Default choice for classic tasks that need completion by a specific date/time without defining a duration block.
 
-Rules:
-- title: extract the core task, strip meta words like "urgent", "high priority", "due tomorrow"
-- priority: "urgent" / "critical" / "asap" → high; "soon" → medium; "when you can" → low
-- colorTag: infer from domain — bugs/errors → rose; deadlines/reviews → amber; features/builds → emerald; docs/comms → sky; design → violet; default → slate
-- dueDate: resolve relative dates relative to today. Return "today", "tomorrow", day name like "monday", "next week", or null
-- status: default "todo" unless user says "working on", "in progress" → in_progress; "done"/"finished" → done`;
+Extraction rules:
+- title: clear task action, excluding metadata phrasing like "urgent", "due tomorrow", or "for 30 mins".
+- priority: "urgent"/"critical"/"asap" -> high; "soon" -> medium; "whenever" -> low; else -> none.
+- colorTag: infer from task domain (coding/bugs -> rose; reviews/deadlines -> amber; features -> emerald; docs/admin -> sky; design -> violet; else -> slate).
+- dueDate: parse into tokens like "today", "tomorrow", day names like "monday", or null.
+- dueTime: extract concrete times into HH:mm format (24hr clock).
+- start: For "timeBox" mode only. Construct a partial target timestamp format relative to the intent (e.g., "YYYY-MM-DDTHH:mm:00"). If date is missing, infer the target date based on context.
+- duration: For "timeBox" mode only. Extract the time length block strictly in total minutes as an integer.`;
+
+    // Structured JSON schema matching the xAI strict object specs
+    const jsonSchema = {
+      name: "task_extraction",
+      strict: true,
+      schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          priority: { type: "string", enum: ["high", "medium", "low", "none"] },
+          status: { type: "string", enum: ["todo", "in_progress", "done", "cancelled"] },
+          mode: { type: "string", enum: ["deadline", "timeBox", "floating"] },
+          dueDate: { type: "string", nullable: true },
+          dueTime: { type: "string", nullable: true, description: "Format as HH:mm or null" },
+          start: { type: "string", nullable: true, description: "For timebox mode: YYYY-MM-DDTHH:mm:00 structure or null" },
+          duration: { type: "number", description: "Duration block in total minutes, default 0" },
+          colorTag: { type: "string", enum: ["rose", "amber", "emerald", "sky", "violet", "slate"] }
+        },
+        required: ["title", "description", "priority", "status", "mode", "dueDate", "dueTime", "start", "duration", "colorTag"],
+        additionalProperties: false
+      }
+    };
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const apiKey = process.env.NEXT_PUBLIC_XAI_API_KEY;
+      if (!apiKey) throw new Error("xAI API key is missing from environment variables.");
+
+      const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: trimmed }],
+          model: 'grok-2-1212', // Can change to 'grok-beta' if preferred
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: trimmed }
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: jsonSchema
+          },
+          temperature: 0.1,
         }),
       });
 
-      if (!response.ok) throw new Error(`API error ${response.status}`);
+      if (!response.ok) throw new Error(`xAI API error ${response.status}`);
 
       const data = await response.json();
-      const text = data.content?.find((b: { type: string }) => b.type === 'text')?.text ?? '';
-      const clean = text.replace(/```(?:json)?|```/g, '').trim();
-      const parsed = JSON.parse(clean) as NlpParsedTask;
+      const textOutput = data.choices?.[0]?.message?.content;
+      if (!textOutput) throw new Error("Received an empty response text payload from xAI.");
 
-      // Validate and normalise
+      const parsed = JSON.parse(textOutput);
+
+      // Validate sets
       const validPriorities: TaskPriority[] = ['high', 'medium', 'low', 'none'];
       const validStatuses: TaskStatus[] = ['todo', 'in_progress', 'done', 'cancelled'];
+      const validModes = ['deadline', 'timeBox', 'floating'];
       const validColors = TASK_COLOR_OPTIONS.map((c) => c.value);
+
+      let resolvedDueDate = resolveDate(parsed.dueDate);
+      let calculatedStart = parsed.start;
+
+      if (parsed.mode === 'timeBox' && parsed.start) {
+        if (parsed.start.includes('tomorrow')) {
+          calculatedStart = parsed.start.replace('tomorrow', offsetISO(1));
+        } else if (parsed.start.includes('today')) {
+          calculatedStart = parsed.start.replace('today', todayISO());
+        }
+        if (calculatedStart && calculatedStart.length >= 10) {
+          resolvedDueDate = calculatedStart.slice(0, 10);
+        }
+      }
 
       const result: NlpParsedTask = {
         title: typeof parsed.title === 'string' ? parsed.title.trim() : trimmed,
         description: typeof parsed.description === 'string' ? parsed.description.trim() : '',
         priority: validPriorities.includes(parsed.priority) ? parsed.priority : 'none',
         status: validStatuses.includes(parsed.status) ? parsed.status : 'todo',
-        dueDate: resolveDate(parsed.dueDate),
+        mode: validModes.includes(parsed.mode) ? parsed.mode : 'deadline',
+        dueDate: resolvedDueDate,
+        dueTime: parsed.dueTime || (parsed.mode === 'timeBox' && calculatedStart ? calculatedStart.slice(11, 16) : null),
         colorTag: validColors.includes(parsed.colorTag) ? parsed.colorTag : 'slate',
+        start: calculatedStart,
+        duration: Number(parsed.duration) || 0,
       };
 
       setInput('');
       onParsed(result, trimmed);
     } catch (err) {
-      console.error('NLP parse failed:', err);
-      setError('Couldn\'t parse that — opening blank task instead.');
-      // Graceful fallback: open modal with just the raw title
+      console.error('xAI NLP parse failed:', err);
+      setError("Couldn't parse that — opening blank task instead.");
+
       setTimeout(() => {
         setError(null);
         onParsed({
@@ -164,6 +211,7 @@ Rules:
           description: '',
           priority: 'none',
           status: 'todo',
+          mode: 'deadline',
           dueDate: null,
           colorTag: 'slate',
         }, trimmed);
@@ -182,12 +230,10 @@ Rules:
   return (
     <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-r from-indigo-50/60 via-white to-purple-50/40 dark:from-indigo-950/20 dark:via-zinc-900 dark:to-purple-950/20">
       <div className="flex items-center gap-2">
-        {/* Icon */}
         <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400">
           <Sparkles size={15} />
         </div>
 
-        {/* Input */}
         <div className="relative flex-1">
           <input
             ref={inputRef}
@@ -209,21 +255,16 @@ Rules:
           )}
         </div>
 
-        {/* Submit */}
         <button
           onClick={parse}
           disabled={!input.trim() || loading}
           className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           aria-label="Parse task"
         >
-          {loading
-            ? <Loader2 size={14} className="animate-spin" />
-            : <ArrowRight size={14} />
-          }
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
         </button>
       </div>
 
-      {/* Label + error */}
       <AnimatePresence>
         {error ? (
           <motion.p
@@ -242,7 +283,7 @@ Rules:
             animate={{ opacity: 1 }}
             className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500"
           >
-            Describe a task in plain English — AI fills in priority, due date & more
+            Describe a task in plain English — AI automatically switches modes, extracts time blocks, and sets priorities.
           </motion.p>
         )}
       </AnimatePresence>

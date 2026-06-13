@@ -46,8 +46,7 @@ function getColorHex(task: Task) {
 }
 
 function getDeadlineColor(task: Task): string {
-  // Only for deadline mode
-  if (task.mode !== 'deadline' || !task.dueDate) return getColorHex(task); // fallback to task color
+  if (task.mode !== 'deadline' || !task.dueDate) return getColorHex(task);
 
   const dueDateTime = task.dueTime
     ? new Date(`${task.dueDate}T${task.dueTime}:00`)
@@ -58,17 +57,13 @@ function getDeadlineColor(task: Task): string {
   const diffHours = diffMs / (1000 * 60 * 60);
 
   if (diffHours < 0) {
-    // Overdue
-    return '#ef4444'; // red-500
+    return '#ef4444'; // Overdue
   } else if (diffHours < 1) {
-    // Less than 1 hour
-    return '#f97316'; // orange-500
+    return '#f97316'; // < 1 hr
   } else if (diffHours < 24) {
-    // Less than 24 hours
-    return '#eab308'; // yellow-500
+    return '#eab308'; // < 24 hrs
   } else {
-    // More than 24 hours
-    return '#10b981'; // emerald-500
+    return '#10b981'; // > 24 hrs
   }
 }
 
@@ -79,13 +74,14 @@ function StatusIcon({ status }: { status: Task['status'] }) {
   return <Circle size={13} className="text-gray-300 flex-shrink-0" />;
 }
 
-// ─── Stats Bar ───────────────────────────────────────────────────────────────
 function StatsBar({ tasks }: { tasks: Task[] }) {
   const done = tasks.filter((t) => t.status === 'done').length;
   const inProgress = tasks.filter((t) => t.status === 'in_progress').length;
   const overdue = tasks.filter((t) => {
     if (!t.dueDate || t.status === 'done' || t.status === 'cancelled') return false;
-    return new Date(t.dueDate + 'T00:00:00') < new Date(new Date().toDateString());
+    // Evaluation combines time signature if present to prevent false positive tags before target runtime hour
+    const checkTime = t.dueTime ? `T${t.dueTime}:00` : 'T23:59:59';
+    return new Date(t.dueDate + checkTime) < new Date();
   }).length;
   const total = tasks.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -123,7 +119,6 @@ function Stat({ icon, label, value, color }: { icon: React.ReactNode; label: str
   );
 }
 
-// ─── Month View ───────────────────────────────────────────────────────────────
 function MonthView({
   year, month, tasks, todayISO, selectedDay,
   onSelectDay, onNewTask, direction,
@@ -152,7 +147,6 @@ function MonthView({
         exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.22, ease: 'easeInOut' }}
       >
-        {/* Day-of-week headers */}
         <div className="grid grid-cols-7 mb-1">
           {DAYS_SHORT.map((d, i) => (
             <div key={i} className="text-center text-[10px] sm:text-xs font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider py-2">
@@ -160,7 +154,6 @@ function MonthView({
             </div>
           ))}
         </div>
-        {/* Grid */}
         <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
           {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
           {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -193,26 +186,23 @@ function MonthView({
                   {day}
                 </span>
 
-                {/* Task dots with mode-specific styling */}
                 <div className="flex flex-wrap gap-0.5 justify-center mt-0.5 px-0.5">
                   {dayTasks.slice(0, 3).map((t, index) => {
-                    // Determine the color based on mode and deadline proximity
                     let bgColor = getColorHex(t);
                     if (t.mode === 'deadline') {
                       bgColor = getDeadlineColor(t);
                     } else if (t.mode === 'timeBox') {
-                      bgColor = '#8b5cf6'; // violet-500 for time box
+                      bgColor = '#8b5cf6';
                     } else if (t.mode === 'floating') {
-                      bgColor = '#6366f1'; // indigo-500 for floating
+                      bgColor = '#6366f1';
                     }
 
                     return (
                       <span
                         key={`${t.id}-${index}`}
-                        className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0 transition-all duration-200"
+                        className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full flex-shrink-0 transition-all duration-200 relative"
                         style={{ backgroundColor: bgColor }}
                       >
-                        {/* Mode indicator */}
                         {t.mode === 'timeBox' && (
                           <RotateCw size={8} className="absolute -top-1 -left-1 text-white/[0.8] scale-75" />
                         )}
@@ -227,7 +217,6 @@ function MonthView({
                   )}
                 </div>
 
-                {/* Quick-add on hover (desktop only) */}
                 <button
                   onClick={(e) => { e.stopPropagation(); onNewTask(iso); }}
                   className="absolute bottom-0.5 right-0.5 opacity-0 group-hover:opacity-100 p-0.5 rounded-md hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-400 transition-all hidden sm:block"
@@ -243,7 +232,6 @@ function MonthView({
   );
 }
 
-// ─── Week View ────────────────────────────────────────────────────────────────
 function WeekView({
   year, month, selectedDay, tasks, todayISO, onSelectDay, onNewTask,
 }: {
@@ -255,7 +243,6 @@ function WeekView({
     return acc;
   }, {}), [tasks]);
 
-  // Find the week containing selectedDay (or today)
   const anchor = selectedDay ?? todayISO;
   const anchorDate = new Date(anchor + 'T00:00:00');
   const startOfWeek = new Date(anchorDate);
@@ -312,7 +299,6 @@ function WeekView({
                         <Clock size={8} /> {task.dueTime}
                       </span>
                     )}
-                    {/* Mode indicator for week view */}
                     {task.mode === 'timeBox' && (
                       <span className="text-[8px] font-bold opacity-75 flex items-center gap-0.5 ml-2">
                         <RotateCw size={8} />
@@ -340,7 +326,6 @@ function WeekView({
   );
 }
 
-// ─── Agenda View ──────────────────────────────────────────────────────────────
 function AgendaView({ tasks, onEditTask, onNewTask }: {
   tasks: Task[];
   onEditTask: (t: Task) => void;
@@ -349,7 +334,6 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
   const now = new Date();
   const todayISO = toISO(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Group by date, sorted
   const grouped = useMemo(() => {
     const withDate = tasks
       .filter((t) => t.dueDate)
@@ -415,7 +399,6 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
                       {task.description && (
                         <p className="text-xs text-gray-400 truncate">{task.description}</p>
                       )}
-                      {/* Mode indicator */}
                       {task.mode === 'timeBox' && (
                         <span className="text-xs font-bold opacity-75 flex items-center gap-1 ml-2">
                           <RotateCw size={10} />
@@ -464,7 +447,6 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
   );
 }
 
-// ─── Day Detail Panel ─────────────────────────────────────────────────────────
 function DayPanel({
   selectedDay, tasksByDate, onNewTask, onEditTask, todayISO,
 }: {
@@ -535,10 +517,10 @@ function DayPanel({
                 bgColor = getDeadlineColor(task) + '18';
                 borderColor = `3px solid ${getDeadlineColor(task)}`;
               } else if (task.mode === 'timeBox') {
-                bgColor = '#8b5cf618'; // violet-500 with 10% opacity
+                bgColor = '#8b5cf618';
                 borderColor = '3px solid #8b5cf6';
               } else if (task.mode === 'floating') {
-                bgColor = '#6366f118'; // indigo-500 with 10% opacity
+                bgColor = '#6366f118';
                 borderColor = '3px solid #6366f1';
               }
               return (
@@ -566,7 +548,6 @@ function DayPanel({
                           {task.priority}
                         </p>
                       )}
-                      {/* Mode badge */}
                       {task.mode === 'timeBox' && (
                         <span className="text-[9px] font-bold opacity-75 flex items-center gap-2">
                           <RotateCw size={10} className="mr-1" />
@@ -591,7 +572,6 @@ function DayPanel({
   );
 }
 
-// ─── Main Export ──────────────────────────────────────────────────────────────
 export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -632,9 +612,7 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white dark:bg-zinc-900">
-      {/* ── Top Header ─────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-zinc-800">
-        {/* Nav */}
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
@@ -658,7 +636,6 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
           </button>
         </div>
 
-        {/* Today button */}
         <button
           onClick={goToToday}
           className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors border border-gray-200 dark:border-zinc-700"
@@ -666,10 +643,8 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
           Today
         </button>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* View switcher */}
         <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-lg p-1 gap-0.5">
           {(['month', 'week', 'agenda'] as CalView[]).map((v) => (
             <button
@@ -686,7 +661,6 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
           ))}
         </div>
 
-        {/* New Task */}
         <button
           onClick={() => onNewTask()}
           className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs sm:text-sm font-semibold rounded-lg hover:opacity-90 transition-all"
@@ -695,10 +669,8 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
         </button>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────── */}
       <StatsBar tasks={tasks} />
 
-      {/* ── Main Calendar Area ──────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-3 sm:p-5">
           {calView === 'month' && (
@@ -726,7 +698,6 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
           )}
         </div>
 
-        {/* ── Day Detail Panel (month + week view only, desktop) ─── */}
         <AnimatePresence>
           {selectedDay && calView !== 'agenda' && (
             <DayPanel
@@ -741,7 +712,7 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
         </AnimatePresence>
       </div>
 
-      {/* ── Mobile: Tap-to-view tasks bottom sheet ─────────────────── */}
+      {/* ── Mobile View Sheets Panel ── */}
       <AnimatePresence>
         {selectedDay && calView === 'month' && (
           <motion.div
@@ -752,7 +723,6 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className="sm:hidden fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-2xl border-t border-gray-100 dark:border-zinc-800 max-h-[60vh] flex flex-col"
           >
-            {/* Handle */}
             <div className="flex justify-center py-3 flex-shrink-0">
               <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-zinc-700" />
             </div>
@@ -790,12 +760,12 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
                   let borderColor = `3px solid ${hex}`;
                   if (task.mode === 'deadline') {
                     bgColor = getDeadlineColor(task) + '18';
-                    borderColor = `3px solid ${getDeadlineColor(task)}`;
+                    borderColor = `3px solid ${getDeadlineColor(task)}`; // Fixed from token to task reference
                   } else if (task.mode === 'timeBox') {
-                    bgColor = '#8b5cf618'; // violet-500 with 10% opacity
+                    bgColor = '#8b5cf618';
                     borderColor = '3px solid #8b5cf6';
                   } else if (task.mode === 'floating') {
-                    bgColor = '#6366f118'; // indigo-500 with 10% opacity
+                    bgColor = '#6366f118';
                     borderColor = '3px solid #6366f1';
                   }
                   return (
@@ -815,7 +785,6 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
                             </span>
                           )}
                           {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
-                          {/* Mode badge */}
                           {task.mode === 'timeBox' && (
                             <span className="text-xs font-bold opacity-75 flex items-center gap-1">
                               <RotateCw size={10} className="mr-1" />

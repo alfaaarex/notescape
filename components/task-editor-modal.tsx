@@ -58,16 +58,17 @@ export function TaskEditorModal({
       setPriority(task.priority);
       setStatus(task.status);
       setColorTag(task.colorTag);
-      // Determine mode from task
+
+      // Determine mode from task safely using type casting for custom fields
       if (task.mode === 'timeBox') {
         setMode('timeBox');
-        // Assuming task.start is ISO datetime string
-        if (task.start) {
-          const start = new Date(task.start);
+        const rawStart = (task as any).start;
+        if (rawStart) {
+          const start = new Date(rawStart);
           setStartDate(start.toISOString().split('T')[0]);
           setStartTime(start.toTimeString().slice(0, 5));
         }
-        setDuration(task.duration ?? 0);
+        setDuration((task as any).duration ?? 0);
       } else if (task.mode === 'floating') {
         setMode('floating');
         setDueDate(task.dueDate ?? '');
@@ -85,15 +86,16 @@ export function TaskEditorModal({
       setPriority(nlpPrefill.priority);
       setStatus(nlpPrefill.status);
       setColorTag(nlpPrefill.colorTag);
-      // Assume nlpPrefill provides mode? We'll default to deadline
+
       setMode(nlpPrefill.mode ?? 'deadline');
       if (nlpPrefill.mode === 'timeBox') {
-        if (nlpPrefill.start) {
-          const start = new Date(nlpPrefill.start);
+        const rawStart = (nlpPrefill as any).start;
+        if (rawStart) {
+          const start = new Date(rawStart);
           setStartDate(start.toISOString().split('T')[0]);
           setStartTime(start.toTimeString().slice(0, 5));
         }
-        setDuration(nlpPrefill.duration ?? 0);
+        setDuration((nlpPrefill as any).duration ?? 0);
         setDueDate('');
         setDueTime('');
       } else if (nlpPrefill.mode === 'floating') {
@@ -127,7 +129,8 @@ export function TaskEditorModal({
     if (!title.trim()) return;
     setSaving(true);
     try {
-      const taskData: Task = {
+      // 1. Remove the strict type annotation from the variable definition
+      const taskData = {
         id: task?.id ?? crypto.randomUUID(),
         title: title.trim(),
         description,
@@ -139,8 +142,8 @@ export function TaskEditorModal({
         ...(mode === 'timeBox' ? {
           start: `${startDate}T${startTime}:00`, // ISO datetime
           duration,
-          dueDate: null,
-          dueTime: null,
+          dueDate: startDate || null,
+          dueTime: startTime || null,
         } : mode === 'floating' ? {
           start: null,
           duration: 0,
@@ -155,7 +158,8 @@ export function TaskEditorModal({
         linkedNoteId,
         createdAt: task?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
-      };
+      } as Task & { start: string | null; duration: number }; // 2. Assert the type here
+
       await onSave(taskData);
       onClose();
     } finally {
@@ -359,7 +363,7 @@ export function TaskEditorModal({
                 </>
               )}
 
-              {/* Grid 1: Timelines & Status (only for deadline and timeBox? we put status always) */}
+              {/* Grid 1: Timelines & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Status */}
                 <div>
