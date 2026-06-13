@@ -178,17 +178,17 @@ function MonthView({
                 key={iso}
                 onClick={() => onSelectDay(iso)}
                 className={`group relative flex flex-col items-center rounded-xl p-1 sm:p-1.5 min-h-[52px] sm:min-h-[72px] transition-all duration-150 border ${isSelected
-                    ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white shadow-md'
-                    : isToday
-                      ? 'bg-indigo-50 dark:bg-indigo-900/25 border-indigo-200 dark:border-indigo-700'
-                      : hasOverdue
-                        ? 'border-red-100 dark:border-red-900/30 hover:bg-red-50/50 dark:hover:bg-red-900/10'
-                        : 'border-transparent hover:bg-gray-50 dark:hover:bg-zinc-800/70'
+                  ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white shadow-md'
+                  : isToday
+                    ? 'bg-indigo-50 dark:bg-indigo-900/25 border-indigo-200 dark:border-indigo-700'
+                    : hasOverdue
+                      ? 'border-red-100 dark:border-red-900/30 hover:bg-red-50/50 dark:hover:bg-red-900/10'
+                      : 'border-transparent hover:bg-gray-50 dark:hover:bg-zinc-800/70'
                   }`}
               >
                 <span className={`text-[11px] sm:text-xs font-bold w-5 sm:w-6 h-5 sm:h-6 flex items-center justify-center rounded-full ${isSelected ? 'text-white dark:text-gray-900'
-                    : isToday ? 'text-indigo-600 dark:text-indigo-400'
-                      : 'text-gray-600 dark:text-gray-400'
+                  : isToday ? 'text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-600 dark:text-gray-400'
                   }`}>
                   {day}
                 </span>
@@ -281,8 +281,8 @@ function WeekView({
           <div
             key={iso}
             className={`flex-1 flex flex-col rounded-xl border transition-all ${isSelected ? 'border-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/15' :
-                isToday ? 'border-indigo-200 dark:border-indigo-800' :
-                  'border-gray-100 dark:border-zinc-800'
+              isToday ? 'border-indigo-200 dark:border-indigo-800' :
+                'border-gray-100 dark:border-zinc-800'
               }`}
           >
             <button
@@ -381,10 +381,10 @@ function AgendaView({ tasks, onEditTask, onNewTask }: {
         return (
           <div key={iso} className="mb-2">
             <div className={`sticky top-0 flex items-center gap-3 px-4 sm:px-6 py-2 text-xs font-bold uppercase tracking-widest z-10 ${isToday
-                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-900/20 backdrop-blur-sm'
-                : isPast
-                  ? 'text-red-400 bg-red-50/60 dark:bg-red-900/10 backdrop-blur-sm'
-                  : 'text-gray-500 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm'
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-900/20 backdrop-blur-sm'
+              : isPast
+                ? 'text-red-400 bg-red-50/60 dark:bg-red-900/10 backdrop-blur-sm'
+                : 'text-gray-500 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm'
               }`}>
               <span>{isToday ? 'Today · ' : ''}{d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
               <span className="ml-auto font-normal normal-case text-gray-400 dark:text-zinc-500">{grouped.map[iso].length} task{grouped.map[iso].length !== 1 ? 's' : ''}</span>
@@ -576,8 +576,8 @@ function DayPanel({
                       {task.mode === 'floating' && (
                         <span className="text-[9px] font-bold opacity-75 flex items-center gap-2">
                           <CalendarDays size={10} className="mr-1" />
-                            Floating
-                          </span>
+                          Floating
+                        </span>
                       )}
                     </div>
                   </div>
@@ -676,8 +676,8 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
               key={v}
               onClick={() => setCalView(v)}
               className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${calView === v
-                  ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                 }`}
             >
               {VIEW_ICONS[v]}
@@ -790,7 +790,7 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
                   let borderColor = `3px solid ${hex}`;
                   if (task.mode === 'deadline') {
                     bgColor = getDeadlineColor(task) + '18';
-                    borderColor = `3px solid ${getDeadlineColor(token)}`;
+                    borderColor = `3px solid ${getDeadlineColor(task)}`;
                   } else if (task.mode === 'timeBox') {
                     bgColor = '#8b5cf618'; // violet-500 with 10% opacity
                     borderColor = '3px solid #8b5cf6';

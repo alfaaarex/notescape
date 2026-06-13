@@ -27,6 +27,8 @@ export interface Task {
   linkedNoteId: string | null;
   createdAt: number;
   updatedAt: number;
+  dueTime?: string;      // <-- Ensure this is present
+  mode?: 'deadline' | 'timeBox' | 'floating'; // <-- Ensure this is present
 }
 
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -51,10 +53,10 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export const TASK_COLOR_OPTIONS = [
-  { label: 'Rose',    value: 'rose',    hex: '#fda4af' },
-  { label: 'Amber',   value: 'amber',   hex: '#fcd34d' },
+  { label: 'Rose', value: 'rose', hex: '#fda4af' },
+  { label: 'Amber', value: 'amber', hex: '#fcd34d' },
   { label: 'Emerald', value: 'emerald', hex: '#6ee7b7' },
-  { label: 'Sky',     value: 'sky',     hex: '#7dd3fc' },
-  { label: 'Violet',  value: 'violet',  hex: '#c4b5fd' },
-  { label: 'Slate',   value: 'slate',   hex: '#94a3b8' },
+  { label: 'Sky', value: 'sky', hex: '#7dd3fc' },
+  { label: 'Violet', value: 'violet', hex: '#c4b5fd' },
+  { label: 'Slate', value: 'slate', hex: '#94a3b8' },
 ];
