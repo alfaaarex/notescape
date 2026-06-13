@@ -54,7 +54,6 @@ export default function LoginPage() {
             data: {
               name: name,
             },
-            emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
           },
         });
         if (signUpError) {

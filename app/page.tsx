@@ -120,7 +120,6 @@ export default function Home() {
         `}>
           <Sidebar
             notes={notes}
-            tasks={tasks}
             activeView={view}
             selectedNoteId={selectedNoteId}
             onSelectNote={handleSelectNote}
