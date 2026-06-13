@@ -7,6 +7,7 @@ import { useNotes } from '@/lib/storage';
 import { useTasks } from '@/lib/tasks';
 import { useAuth } from '@/components/auth-provider';
 import type { Task } from '@/lib/types';
+import type { NlpParsedTask } from '@/components/nlp-task-input';
 import { Sidebar, SidebarView } from '@/components/sidebar';
 import { NoteGrid } from '@/components/note-grid';
 import { Editor } from '@/components/editor';
@@ -28,6 +29,7 @@ export default function Home() {
   const [taskModalOpen, setTaskModalOpen]     = useState(false);
   const [editingTask, setEditingTask]         = useState<Task | null>(null);
   const [prefillDate, setPrefillDate]         = useState<string | undefined>();
+  const [nlpPrefill, setNlpPrefill]           = useState<NlpParsedTask | null>(null);
   const [cmdOpen, setCmdOpen]                 = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen]       = useState(false);
@@ -69,7 +71,15 @@ export default function Home() {
 
   const handleOpenTaskModal = useCallback((date?: string) => {
     setEditingTask(null);
+    setNlpPrefill(null);
     setPrefillDate(date);
+    setTaskModalOpen(true);
+  }, []);
+
+  const handleNlpTask = useCallback((parsed: NlpParsedTask) => {
+    setEditingTask(null);
+    setNlpPrefill(parsed);
+    setPrefillDate(undefined);
     setTaskModalOpen(true);
   }, []);
 
@@ -203,6 +213,7 @@ export default function Home() {
                   <TaskBoard
                     tasks={tasks}
                     onNewTask={() => handleOpenTaskModal()}
+                    onNlpTask={handleNlpTask}
                     onEditTask={handleEditTask}
                     onDeleteTask={deleteTask}
                     onUpdateStatus={updateTaskStatus}
@@ -234,8 +245,9 @@ export default function Home() {
         task={editingTask}
         notes={notes}
         prefillDate={prefillDate}
+        nlpPrefill={nlpPrefill}
         onSave={saveTask}
-        onClose={() => { setTaskModalOpen(false); setEditingTask(null); }}
+        onClose={() => { setTaskModalOpen(false); setEditingTask(null); setNlpPrefill(null); }}
       />
 
       <CommandPalette

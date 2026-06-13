@@ -22,10 +22,12 @@ import {
   STATUS_LABELS,
   TASK_COLOR_OPTIONS,
 } from '@/lib/types';
+import { NlpTaskInput, type NlpParsedTask } from '@/components/nlp-task-input';
 
 interface TaskBoardProps {
   tasks: Task[];
   onNewTask: () => void;
+  onNlpTask: (parsed: NlpParsedTask, raw: string) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onUpdateStatus: (id: string, status: Task['status']) => void;
@@ -215,6 +217,7 @@ function getNextStatus(current: Task['status']): Task['status'] {
 export function TaskBoard({
   tasks,
   onNewTask,
+  onNlpTask,
   onEditTask,
   onDeleteTask,
   onUpdateStatus,
@@ -291,6 +294,9 @@ export function TaskBoard({
           ))}
         </div>
       </div>
+
+      {/* ── NLP Input ──────────────────────────────────────────────────── */}
+      <NlpTaskInput onParsed={onNlpTask} />
 
       {isEmpty ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 py-16">

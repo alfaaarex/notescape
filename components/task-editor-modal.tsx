@@ -11,12 +11,14 @@ import {
   TASK_COLOR_OPTIONS,
 } from '@/lib/types';
 import type { Note } from '@/lib/storage';
+import type { NlpParsedTask } from '@/components/nlp-task-input';
 
 interface TaskEditorModalProps {
   open: boolean;
   task?: Task | null;
   notes: Note[];
   prefillDate?: string;
+  nlpPrefill?: NlpParsedTask | null;
   onSave: (task: Task) => Promise<void>;
   onClose: () => void;
 }
@@ -29,6 +31,7 @@ export function TaskEditorModal({
   task,
   notes,
   prefillDate,
+  nlpPrefill,
   onSave,
   onClose,
 }: TaskEditorModalProps) {
@@ -50,6 +53,14 @@ export function TaskEditorModal({
       setColorTag(task.colorTag);
       setDueDate(task.dueDate ?? '');
       setLinkedNoteId(task.linkedNoteId);
+    } else if (nlpPrefill) {
+      setTitle(nlpPrefill.title);
+      setDescription(nlpPrefill.description);
+      setPriority(nlpPrefill.priority);
+      setStatus(nlpPrefill.status);
+      setColorTag(nlpPrefill.colorTag);
+      setDueDate(nlpPrefill.dueDate ?? '');
+      setLinkedNoteId(null);
     } else {
       setTitle('');
       setDescription('');
@@ -59,7 +70,7 @@ export function TaskEditorModal({
       setDueDate(prefillDate ?? '');
       setLinkedNoteId(null);
     }
-  }, [task, open, prefillDate]);
+  }, [task, nlpPrefill, open, prefillDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,9 +119,17 @@ export function TaskEditorModal({
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-zinc-800">
-              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                {task ? 'Edit Task' : 'New Task'}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                  {task ? 'Edit Task' : 'New Task'}
+                </h2>
+                {nlpPrefill && !task && (
+                  <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 15l-5 3.2 1.9-5.8L4 8.8h6.1z"/></svg>
+                    AI filled
+                  </span>
+                )}
+              </div>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
