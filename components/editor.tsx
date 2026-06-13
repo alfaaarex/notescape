@@ -12,6 +12,7 @@ import {
   Check,
   CheckSquare,
   Code,
+  Copy,
   Eye,
   EyeOff,
   Focus,
@@ -30,8 +31,10 @@ import {
   Pin,
   PinOff,
   Quote,
+  RefreshCw,
   Sparkles,
   Strikethrough,
+  Tag,
   Trash2,
   Type,
   X,
@@ -263,6 +266,14 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryData, setSummaryData] = useState<{
+    summary: string;
+    themes: string[];
+    actions: string[];
+    suggestedTags: string[];
+  } | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -295,6 +306,8 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
     setSaveStatus('idle');
     setSlashOpen(false);
     setPreviewOpen(false);
+    setSummaryData(null);
+    setSummaryError(null);
   }, [note]);
 
   const triggerSave = useCallback(() => {
@@ -401,10 +414,90 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
     if (note?.id && onTogglePin) await onTogglePin(note.id);
   };
 
-  const handleGenerateSummary = () => {
+  const handleGenerateSummary = async () => {
     setShowSummary(true);
+    if (isGeneratingSummary) return;
+
+    // Need at least some content to summarise
+    if (!content.trim() || wordCount < 10) {
+      setSummaryData(null);
+      setSummaryError('Write a bit more before generating an insight.');
+      return;
+    }
+
     setIsGeneratingSummary(true);
-    window.setTimeout(() => setIsGeneratingSummary(false), 1400);
+    setSummaryError(null);
+    setSummaryData(null);
+
+    const systemPrompt = `You are a note analyst. Analyse the note and return ONLY a valid JSON object — no markdown fences, no prose.
+
+JSON shape:
+{
+  "summary": string,         // 2-3 sentence plain-English summary of the note
+  "themes": string[],        // 2-4 key themes or topics (short noun phrases, ≤4 words each)
+  "actions": string[],       // 0-4 concrete action items you can infer from the note (imperative phrases); empty array if none
+  "suggestedTags": string[]  // 2-5 short tag words (lowercase, no spaces, no #) relevant to the content
+}
+
+Rules:
+- summary: be direct and useful, not generic
+- themes: extract the actual topics discussed, not meta commentary
+- actions: only include if genuinely inferable — leave empty rather than guess
+- suggestedTags: suggest tags different from the ones already on the note if possible`;
+
+    try {
+      const existingTagsNote = tags.length > 0 ? `\n\nExisting tags: ${tags.join(', ')}` : '';
+      const noteText = `Title: ${title || 'Untitled'}\n\n${content}${existingTagsNote}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: noteText }],
+        }),
+      });
+
+      if (!response.ok) throw new Error(`API error ${response.status}`);
+
+      const data = await response.json();
+      const text = data.content?.find((b: { type: string }) => b.type === 'text')?.text ?? '';
+      const clean = text.replace(/```(?:json)?|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+
+      setSummaryData({
+        summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+        themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 4) : [],
+        actions: Array.isArray(parsed.actions) ? parsed.actions.slice(0, 4) : [],
+        suggestedTags: Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags.slice(0, 5) : [],
+      });
+    } catch (err) {
+      console.error('Summary failed:', err);
+      setSummaryError('Couldn\'t generate insight — please try again.');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleCopySummary = () => {
+    if (!summaryData) return;
+    const text = [
+      summaryData.summary,
+      summaryData.themes.length ? `\nThemes: ${summaryData.themes.join(', ')}` : '',
+      summaryData.actions.length ? `\nAction items:\n${summaryData.actions.map(a => `- ${a}`).join('\n')}` : '',
+    ].join('');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+    });
+  };
+
+  const handleAddSuggestedTag = (tag: string) => {
+    if (!tags.includes(tag)) {
+      handleChange('tags', [...tags, tag]);
+    }
   };
 
   const addTag = () => {
@@ -728,43 +821,180 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
             className="hidden h-full flex-shrink-0 flex-col overflow-hidden border-l border-gray-100 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:flex"
           >
+            {/* Panel header */}
             <div className="flex h-14 min-w-[320px] items-center justify-between border-b border-gray-100 px-4 dark:border-zinc-800">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-200">
-                <Sparkles size={15} /> Note insight
+                <Sparkles size={15} className="text-indigo-400" /> Note Insight
               </div>
-              <button onClick={() => setShowSummary(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900">
-                <X size={15} />
-              </button>
+              <div className="flex items-center gap-1">
+                {summaryData && !isGeneratingSummary && (
+                  <button
+                    onClick={handleGenerateSummary}
+                    title="Regenerate"
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                )}
+                <button onClick={() => setShowSummary(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900">
+                  <X size={15} />
+                </button>
+              </div>
             </div>
+
+            {/* Panel body */}
             <div className="min-w-[320px] flex-1 overflow-y-auto p-5">
-              {isGeneratingSummary ? (
-                <div className="space-y-4">
-                  <div className="flex animate-pulse items-center gap-2 text-sm font-medium text-gray-500 dark:text-zinc-400">
-                    <Loader2 size={15} className="animate-spin" /> Reading note...
+
+              {/* Stats row — always shown */}
+              <div className="mb-5 grid grid-cols-3 gap-2">
+                <Stat label="Words" value={wordCount.toString()} />
+                <Stat label="Read" value={`${readTime} min`} />
+                <Stat label="Lines" value={content.split('\n').filter(l => l.trim()).length.toString()} />
+              </div>
+
+              {/* Loading skeleton */}
+              {isGeneratingSummary && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-2 text-xs font-medium text-indigo-400 dark:text-indigo-500">
+                    <Loader2 size={13} className="animate-spin" />
+                    Reading your note…
                   </div>
-                  <div className="mt-6 space-y-2.5">
-                    {[88, 75, 92, 58].map((w) => (
-                      <div key={w} className="h-3 rounded-full bg-gray-100 dark:bg-zinc-800" style={{ width: `${w}%` }} />
+                  <div className="space-y-3">
+                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '90%' }} />
+                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '78%' }} />
+                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '84%' }} />
+                  </div>
+                  <div className="space-y-2 pt-2">
+                    {[60, 45, 70].map((w, i) => (
+                      <div key={i} className="h-6 rounded-lg bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: `${w}%` }} />
                     ))}
                   </div>
                 </div>
-              ) : (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="space-y-5">
+              )}
+
+              {/* Error state */}
+              {!isGeneratingSummary && summaryError && (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                  <p className="text-sm text-amber-500 dark:text-amber-400">{summaryError}</p>
+                  {wordCount >= 10 && (
+                    <button
+                      onClick={handleGenerateSummary}
+                      className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
+                    >
+                      <Sparkles size={12} /> Try again
+                    </button>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Empty / not yet generated */}
+              {!isGeneratingSummary && !summaryError && !summaryData && (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4 pt-4 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10">
+                    <Sparkles size={22} className="text-indigo-400" />
+                  </div>
                   <div>
-                    <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">Writing stats</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Stat label="Words" value={wordCount.toString()} />
-                      <Stat label="Read" value={`${readTime} min`} />
+                    <p className="text-sm font-semibold text-gray-700 dark:text-zinc-300">AI Note Insight</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-zinc-500 leading-relaxed">
+                      Get a summary, key themes, action items, and tag suggestions for this note.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGenerateSummary}
+                    disabled={wordCount < 10}
+                    className="flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    <Sparkles size={13} />
+                    {wordCount < 10 ? 'Write more to unlock' : 'Generate Insight'}
+                  </button>
+                </motion.div>
+              )}
+
+              {/* Results */}
+              {!isGeneratingSummary && summaryData && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  {/* Summary */}
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Summary</p>
+                      <button
+                        onClick={handleCopySummary}
+                        title="Copy summary"
+                        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors"
+                      >
+                        {copiedSummary ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                        {copiedSummary ? 'Copied' : 'Copy'}
+                      </button>
                     </div>
+                    <p className="text-sm leading-relaxed text-gray-600 dark:text-zinc-400">
+                      {summaryData.summary}
+                    </p>
                   </div>
-                  <div>
-                    <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">Quick takeaways</p>
-                    <ul className="list-disc space-y-2.5 pl-4 text-sm leading-relaxed text-gray-600 marker:text-gray-300 dark:text-zinc-400 dark:marker:text-zinc-700">
-                      <li>{title ? <>This note is centered on &ldquo;{title}&rdquo;.</> : 'Add a title to give this note a clearer anchor.'}</li>
-                      <li>{tags.length > 0 ? `Tagged with ${tags.map((tag) => `#${tag}`).join(', ')}.` : 'Tags can make this easier to find later.'}</li>
-                      <li>{wordCount > 80 ? 'There is enough text here for a useful summary.' : 'Keep writing to unlock richer summaries.'}</li>
-                    </ul>
-                  </div>
+
+                  {/* Themes */}
+                  {summaryData.themes.length > 0 && (
+                    <div>
+                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Key Themes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {summaryData.themes.map((theme) => (
+                          <span
+                            key={theme}
+                            className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                          >
+                            {theme}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action items */}
+                  {summaryData.actions.length > 0 && (
+                    <div>
+                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Action Items</p>
+                      <ul className="space-y-2">
+                        {summaryData.actions.map((action, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-zinc-400">
+                            <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-400 dark:bg-indigo-500" />
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Suggested tags */}
+                  {summaryData.suggestedTags.length > 0 && (
+                    <div>
+                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Suggested Tags</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {summaryData.suggestedTags.map((tag) => {
+                          const already = tags.includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              onClick={() => !already && handleAddSuggestedTag(tag)}
+                              disabled={already}
+                              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${
+                                already
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 cursor-default'
+                                  : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400'
+                              }`}
+                            >
+                              {already ? <Check size={10} /> : <Tag size={10} />}
+                              #{tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-gray-400 dark:text-zinc-600">Click a tag to add it to your note</p>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </div>
