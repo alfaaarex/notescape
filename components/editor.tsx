@@ -1,8 +1,41 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Calendar, Sparkles, X, Check, Loader2, ArrowLeft, Pin, PinOff, Trash2 } from 'lucide-react';
+import {
+  AlignLeft,
+  ArrowLeft,
+  Bold,
+  Calendar,
+  Check,
+  CheckSquare,
+  Code,
+  Eye,
+  EyeOff,
+  Focus,
+  Heading1,
+  Heading2,
+  Heading3,
+  Highlighter,
+  Italic,
+  Link,
+  List,
+  ListOrdered,
+  Loader2,
+  Minus,
+  Palette,
+  PanelRight,
+  Pin,
+  PinOff,
+  Quote,
+  Sparkles,
+  Strikethrough,
+  Trash2,
+  Type,
+  X,
+} from 'lucide-react';
 import type { Note } from '@/lib/storage';
 
 interface EditorProps {
@@ -13,28 +46,175 @@ interface EditorProps {
   onTogglePin?: (id: string) => Promise<void>;
 }
 
-const colorMap: Record<string, { label: string; hex: string }> = {
-  alabaster: { label: 'Alabaster', hex: '#F9F9F6' },
-  sage:      { label: 'Soft Sage', hex: '#EEF2EE' },
-  linen:     { label: 'Warm Linen', hex: '#FDF8F5' },
-  slate:     { label: 'Faint Slate', hex: '#F0F1F4' },
-  lavender:  { label: 'Washed Lavender', hex: '#F3EFFF' },
+const colorMap: Record<string, { label: string; hex: string; ring: string }> = {
+  alabaster: { label: 'Alabaster', hex: '#F9F9F6', ring: '#E6E4DC' },
+  sage: { label: 'Soft Sage', hex: '#EEF2EE', ring: '#CFDCCF' },
+  linen: { label: 'Warm Linen', hex: '#FDF8F5', ring: '#EAD8CE' },
+  slate: { label: 'Faint Slate', hex: '#F0F1F4', ring: '#D9DDE5' },
+  lavender: { label: 'Washed Lavender', hex: '#F3EFFF', ring: '#DCD1FF' },
+};
+
+type SlashCommand = {
+  id: string;
+  label: string;
+  description: string;
+  category: 'Basics' | 'Structure' | 'Lists' | 'Smart';
+  icon: React.ReactNode;
+  insert: {
+    prefix: string;
+    suffix?: string;
+    placeholder?: string;
+    lineStart?: boolean;
+  };
+};
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    id: 'text',
+    label: 'Text',
+    description: 'Plain writing block',
+    category: 'Basics',
+    icon: <Type size={15} />,
+    insert: { prefix: '', placeholder: '' },
+  },
+  {
+    id: 'h1',
+    label: 'Heading 1',
+    description: 'Large section title',
+    category: 'Structure',
+    icon: <Heading1 size={15} />,
+    insert: { prefix: '# ', placeholder: 'Heading', lineStart: true },
+  },
+  {
+    id: 'h2',
+    label: 'Heading 2',
+    description: 'Medium section title',
+    category: 'Structure',
+    icon: <Heading2 size={15} />,
+    insert: { prefix: '## ', placeholder: 'Heading', lineStart: true },
+  },
+  {
+    id: 'h3',
+    label: 'Heading 3',
+    description: 'Small section title',
+    category: 'Structure',
+    icon: <Heading3 size={15} />,
+    insert: { prefix: '### ', placeholder: 'Heading', lineStart: true },
+  },
+  {
+    id: 'bullet',
+    label: 'Bullet List',
+    description: 'Quick unordered list',
+    category: 'Lists',
+    icon: <List size={15} />,
+    insert: { prefix: '- ', placeholder: 'List item', lineStart: true },
+  },
+  {
+    id: 'numbered',
+    label: 'Numbered List',
+    description: 'Steps or ordered notes',
+    category: 'Lists',
+    icon: <ListOrdered size={15} />,
+    insert: { prefix: '1. ', placeholder: 'First step', lineStart: true },
+  },
+  {
+    id: 'task',
+    label: 'Task List',
+    description: 'Track an action item',
+    category: 'Lists',
+    icon: <CheckSquare size={15} />,
+    insert: { prefix: '- [ ] ', placeholder: 'Todo', lineStart: true },
+  },
+  {
+    id: 'quote',
+    label: 'Quote',
+    description: 'Pull out a quote or thought',
+    category: 'Structure',
+    icon: <Quote size={15} />,
+    insert: { prefix: '> ', placeholder: 'Quote', lineStart: true },
+  },
+  {
+    id: 'code',
+    label: 'Code Block',
+    description: 'Multi-line code snippet',
+    category: 'Structure',
+    icon: <Code size={15} />,
+    insert: { prefix: '```\n', suffix: '\n```', placeholder: 'code' },
+  },
+  {
+    id: 'divider',
+    label: 'Divider',
+    description: 'Separate two sections',
+    category: 'Structure',
+    icon: <Minus size={15} />,
+    insert: { prefix: '---\n', placeholder: '', lineStart: true },
+  },
+  {
+    id: 'callout',
+    label: 'Callout',
+    description: 'Highlight an important note',
+    category: 'Smart',
+    icon: <Highlighter size={15} />,
+    insert: { prefix: '> Note: ', placeholder: 'Important context', lineStart: true },
+  },
+  {
+    id: 'date',
+    label: 'Today',
+    description: 'Insert today\'s date',
+    category: 'Smart',
+    icon: <Calendar size={15} />,
+    insert: { prefix: new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }), placeholder: '' },
+  },
+];
+
+const getLinePrefix = (content: string, cursor: number) => {
+  const lineStart = content.lastIndexOf('\n', cursor - 1) + 1;
+  return { lineStart, prefix: content.slice(lineStart, cursor) };
+};
+
+const estimateReadingTime = (wordCount: number) => Math.max(1, Math.ceil(wordCount / 220));
+
+const renderPreview = (text: string) => {
+  if (!text.trim()) {
+    return <p className="text-gray-400 dark:text-zinc-500">Nothing to preview yet.</p>;
+  }
+
+  return text.split('\n').map((line, index) => {
+    const key = `${index}-${line}`;
+    if (line.startsWith('# ')) return <h1 key={key} className="mt-6 first:mt-0 text-3xl font-bold text-gray-950 dark:text-zinc-50">{line.slice(2)}</h1>;
+    if (line.startsWith('## ')) return <h2 key={key} className="mt-5 text-2xl font-bold text-gray-900 dark:text-zinc-100">{line.slice(3)}</h2>;
+    if (line.startsWith('### ')) return <h3 key={key} className="mt-4 text-xl font-semibold text-gray-900 dark:text-zinc-100">{line.slice(4)}</h3>;
+    if (line.startsWith('- [ ] ')) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300"><span className="mr-2 inline-block h-4 w-4 rounded border border-gray-300 align-[-2px] dark:border-zinc-600" />{line.slice(6)}</p>;
+    if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) return <p key={key} className="my-2 text-gray-500 line-through dark:text-zinc-500"><span className="mr-2 inline-block h-4 w-4 rounded bg-gray-800 align-[-2px] dark:bg-zinc-200" />{line.slice(6)}</p>;
+    if (line.startsWith('- ')) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300"><span className="mr-2">-</span>{line.slice(2)}</p>;
+    if (/^\d+\.\s/.test(line)) return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{line}</p>;
+    if (line.startsWith('> ')) return <blockquote key={key} className="my-3 border-l-2 border-gray-300 pl-4 text-gray-600 italic dark:border-zinc-700 dark:text-zinc-400">{line.slice(2)}</blockquote>;
+    if (line === '---') return <hr key={key} className="my-6 border-gray-200 dark:border-zinc-800" />;
+    if (!line.trim()) return <div key={key} className="h-4" />;
+    return <p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{line}</p>;
+  });
 };
 
 export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorProps) => {
-  const [title, setTitle]         = useState('');
-  const [content, setContent]     = useState('');
-  const [color, setColor]         = useState('alabaster');
-  const [tags, setTags]           = useState<string[]>([]);
-  const [pinned, setPinned]       = useState(false);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [color, setColor] = useState('alabaster');
+  const [tags, setTags] = useState<string[]>([]);
+  const [pinned, setPinned] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
-  const [showColorPicker, setShowColorPicker]   = useState(false);
-  const [showSummary, setShowSummary]           = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [tagInput, setTagInput]   = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashIndex, setSlashIndex] = useState(0);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const noteIdRef = useRef<string>(note?.id ?? crypto.randomUUID());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (note) {
@@ -53,6 +233,8 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
       noteIdRef.current = crypto.randomUUID();
     }
     setSaveStatus('idle');
+    setSlashOpen(false);
+    setPreviewOpen(false);
   }, [note]);
 
   const triggerSave = useCallback(() => {
@@ -67,7 +249,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
           color,
           tags,
           pinned,
-          summary: content.slice(0, 100),
+          summary: content.slice(0, 140),
           updatedAt: Date.now(),
         });
         setSaveStatus('saved');
@@ -75,33 +257,77 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
         console.error('Failed to save note:', err);
         setSaveStatus('idle');
       }
-    }, 700);
+    }, 650);
   }, [title, content, color, tags, pinned, onSave]);
 
-  useEffect(() => {
-    if (saveStatus !== 'idle') return;
-    // don't auto-save on initial mount
+  const handleChange = useCallback((field: 'title' | 'content' | 'color' | 'tags', value: string | string[]) => {
+    if (field === 'title') setTitle(value as string);
+    if (field === 'content') setContent(value as string);
+    if (field === 'color') {
+      setColor(value as string);
+      setShowColorPicker(false);
+    }
+    if (field === 'tags') setTags(value as string[]);
+    setSaveStatus('saving');
   }, []);
 
-  const handleChange = useCallback(
-    (field: 'title' | 'content' | 'color' | 'tags', value: string | string[]) => {
-      if (field === 'title') setTitle(value as string);
-      if (field === 'content') setContent(value as string);
-      if (field === 'color') { setColor(value as string); setShowColorPicker(false); }
-      if (field === 'tags') setTags(value as string[]);
-      setSaveStatus('saving');
-    },
-    [],
-  );
-
-  // Debounced save when anything relevant changes
   useEffect(() => {
-    if (!title && !content) return; // skip if nothing has been typed
+    if (!title && !content) return;
     triggerSave();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, color, tags, pinned]);
+  }, [title, content, color, tags, pinned, triggerSave]);
 
-  useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
+  useEffect(() => () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  }, []);
+
+  const insertText = useCallback((prefix: string, suffix = '', placeholder = '', lineStart = false) => {
+    if (!textareaRef.current) return;
+
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const needsLineBreak = lineStart && start > 0 && content[start - 1] !== '\n';
+    const insertionPrefix = `${needsLineBreak ? '\n' : ''}${prefix}`;
+    const innerText = selectedText || placeholder;
+    const newContent = content.substring(0, start) + insertionPrefix + innerText + suffix + content.substring(end);
+    const selectionStart = start + insertionPrefix.length;
+    const selectionEnd = selectionStart + innerText.length;
+
+    handleChange('content', newContent);
+
+    window.setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(selectionStart, selectionEnd);
+    }, 0);
+  }, [content, handleChange]);
+
+  const insertMarkdown = (prefix: string, suffix = prefix) => insertText(prefix, suffix, 'text');
+
+  const executeSlashCommand = (cmd?: SlashCommand) => {
+    if (!textareaRef.current || !cmd) return;
+    const cursor = textareaRef.current.selectionStart;
+    const textBeforeCursor = content.substring(0, cursor);
+    const lastSlashIdx = textBeforeCursor.lastIndexOf('/');
+    if (lastSlashIdx === -1) return;
+
+    const beforeSlash = content.substring(0, lastSlashIdx);
+    const afterCursor = content.substring(cursor);
+    const { prefix, suffix = '', placeholder = '', lineStart = false } = cmd.insert;
+    const needsLineBreak = lineStart && lastSlashIdx > 0 && content[lastSlashIdx - 1] !== '\n';
+    const insertionPrefix = `${needsLineBreak ? '\n' : ''}${prefix}`;
+    const newContent = beforeSlash + insertionPrefix + placeholder + suffix + afterCursor;
+    const selectionStart = lastSlashIdx + insertionPrefix.length;
+    const selectionEnd = selectionStart + placeholder.length;
+
+    handleChange('content', newContent);
+    setSlashOpen(false);
+    setSlashQuery('');
+
+    window.setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(selectionStart, selectionEnd);
+    }, 0);
+  };
 
   const handleDelete = async () => {
     if (window.confirm('Delete this note permanently?')) {
@@ -118,78 +344,149 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
   const handleGenerateSummary = () => {
     setShowSummary(true);
     setIsGeneratingSummary(true);
-    setTimeout(() => setIsGeneratingSummary(false), 2000);
+    window.setTimeout(() => setIsGeneratingSummary(false), 1400);
   };
 
   const addTag = () => {
-    const t = tagInput.trim();
+    const t = tagInput.trim().replace(/^#/, '');
     if (t && !tags.includes(t)) {
       handleChange('tags', [...tags, t]);
     }
     setTagInput('');
   };
 
+  const filteredCommands = SLASH_COMMANDS.filter((cmd) => {
+    const query = slashQuery.toLowerCase();
+    return cmd.label.toLowerCase().includes(query) || cmd.id.includes(query) || cmd.description.toLowerCase().includes(query);
+  });
+
+  const groupedCommands = filteredCommands.reduce<Record<string, SlashCommand[]>>((acc, cmd) => {
+    acc[cmd.category] = [...(acc[cmd.category] ?? []), cmd];
+    return acc;
+  }, {});
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      insertText('  ');
+      return;
+    }
+
+    if (!slashOpen) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSlashIndex((prev) => (prev + 1) % Math.max(filteredCommands.length, 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSlashIndex((prev) => (prev - 1 + Math.max(filteredCommands.length, 1)) % Math.max(filteredCommands.length, 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      executeSlashCommand(filteredCommands[slashIndex]);
+    } else if (e.key === 'Escape') {
+      setSlashOpen(false);
+    } else if (e.key === 'Backspace' && slashQuery === '') {
+      setSlashOpen(false);
+    }
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    handleChange('content', val);
+
+    const cursor = e.target.selectionStart;
+    const { prefix } = getLinePrefix(val, cursor);
+
+    if (prefix === '/') {
+      setSlashOpen(true);
+      setSlashQuery('');
+      setSlashIndex(0);
+      return;
+    }
+
+    if (slashOpen) {
+      const slashMatch = prefix.match(/\/([^\s/]*)$/);
+      if (slashMatch) {
+        setSlashQuery(slashMatch[1]);
+        setSlashIndex(0);
+      } else {
+        setSlashOpen(false);
+      }
+    }
+  };
+
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
+  const readTime = estimateReadingTime(wordCount);
   const bgHex = colorMap[color]?.hex ?? colorMap.alabaster.hex;
+  const activeCommand = filteredCommands[slashIndex];
 
   return (
-    <div className="flex h-full w-full relative overflow-hidden">
-      {/* Editor Canvas */}
+    <div className={`relative flex h-full w-full overflow-hidden ${focusMode ? 'bg-white dark:bg-zinc-950' : ''}`}>
       <motion.div
         layoutId={note ? `note-${note.id}` : 'new-note'}
-        className="flex flex-col flex-1 h-full overflow-hidden transition-colors duration-300"
-        style={{ backgroundColor: bgHex }}
+        className="flex h-full flex-1 flex-col overflow-hidden bg-[var(--note-bg)] transition-colors duration-300 dark:bg-zinc-950"
+        style={{ '--note-bg': bgHex } as React.CSSProperties}
       >
-        {/* Floating Toolbar */}
         <header
-          className="h-12 px-5 flex items-center gap-2 z-10 sticky top-0 opacity-30 hover:opacity-100 transition-opacity duration-300"
-          style={{ backgroundColor: bgHex + 'cc' }}
+          className={`sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b border-black/5 bg-[color-mix(in_srgb,var(--note-bg)_90%,transparent)] px-4 backdrop-blur-md transition-opacity duration-300 dark:border-white/10 dark:bg-zinc-950/90 ${focusMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
         >
-          {/* Back */}
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:bg-black/5 transition-colors"
-            aria-label="Back"
-          >
-            <ArrowLeft size={16} />
+          <button onClick={onClose} className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100" aria-label="Back">
+            <ArrowLeft size={17} />
           </button>
+
+          <div className="hidden items-center gap-1 rounded-lg bg-white/55 p-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 md:flex">
+            <ToolbarButton label="Heading" onClick={() => insertText('## ', '', 'Heading', true)} icon={<Heading2 size={15} />} />
+            <ToolbarButton label="Bold" onClick={() => insertMarkdown('**')} icon={<Bold size={15} />} />
+            <ToolbarButton label="Italic" onClick={() => insertMarkdown('*')} icon={<Italic size={15} />} />
+            <ToolbarButton label="Strike" onClick={() => insertMarkdown('~~')} icon={<Strikethrough size={15} />} />
+            <ToolbarButton label="Code" onClick={() => insertText('`', '`', 'code')} icon={<Code size={15} />} />
+            <ToolbarButton label="Quote" onClick={() => insertText('> ', '', 'Quote', true)} icon={<Quote size={15} />} />
+            <ToolbarButton label="List" onClick={() => insertText('- ', '', 'List item', true)} icon={<List size={15} />} />
+            <ToolbarButton label="Task" onClick={() => insertText('- [ ] ', '', 'Todo', true)} icon={<CheckSquare size={15} />} />
+            <ToolbarButton label="Link" onClick={() => insertText('[', '](https://)', 'link')} icon={<Link size={15} />} />
+          </div>
 
           <div className="flex-1" />
 
-          {/* Set Reminder */}
-          <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-black/5 transition-colors">
-            <Calendar size={14} />
-            <span className="hidden sm:inline">Remind</span>
+          <button
+            onClick={() => setPreviewOpen((open) => !open)}
+            className={`hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors sm:flex ${previewOpen ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
+          >
+            {previewOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+            Preview
           </button>
 
-          {/* Color Picker */}
+          <button
+            onClick={() => setFocusMode((open) => !open)}
+            className={`hidden rounded-lg p-2 transition-colors sm:block ${focusMode ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
+            aria-label="Focus mode"
+          >
+            <Focus size={15} />
+          </button>
+
           <div className="relative">
-            <button
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              className="p-2 rounded-lg text-gray-500 hover:bg-black/5 transition-colors"
-              aria-label="Background color"
-            >
-              <Palette size={15} />
+            <button onClick={() => setShowColorPicker(!showColorPicker)} className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100" aria-label="Background color">
+              <Palette size={16} />
             </button>
             <AnimatePresence>
               {showColorPicker && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.92, y: -8 }}
+                  initial={{ opacity: 0, scale: 0.96, y: -6 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.92, y: -8 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-full right-0 mt-2 p-2 bg-white rounded-xl shadow-xl border border-gray-100 flex flex-col gap-0.5 w-44 z-50"
+                  exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   {Object.entries(colorMap).map(([key, val]) => (
                     <button
                       key={key}
                       onClick={() => handleChange('color', key)}
-                      className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     >
-                      <span className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: val.hex }} />
+                      <span className="h-5 w-5 flex-shrink-0 rounded-full border" style={{ backgroundColor: val.hex, borderColor: val.ring }} />
                       <span className="flex-1 text-left">{val.label}</span>
-                      {color === key && <Check size={13} className="text-gray-700" />}
+                      {color === key && <Check size={14} className="text-gray-700 dark:text-zinc-200" />}
                     </button>
                   ))}
                 </motion.div>
@@ -197,144 +494,216 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
             </AnimatePresence>
           </div>
 
-          {/* Pin */}
-          <button
-            onClick={handlePinToggle}
-            className={`p-2 rounded-lg transition-colors ${pinned ? 'text-indigo-500 bg-indigo-50' : 'text-gray-500 hover:bg-black/5'}`}
-            aria-label={pinned ? 'Unpin' : 'Pin'}
-          >
+          <button onClick={handlePinToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${pinned ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={pinned ? 'Unpin' : 'Pin'}>
             {pinned ? <Pin size={15} /> : <PinOff size={15} />}
           </button>
 
-          {/* AI Summarize */}
-          <button
-            onClick={handleGenerateSummary}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-          >
-            <Sparkles size={13} />
-            Summarize
+          <button onClick={handleGenerateSummary} className="hidden items-center gap-1.5 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-zinc-800 sm:flex">
+            <Sparkles size={14} />
+            Insight
           </button>
 
-          {/* Delete */}
-          <button
-            onClick={handleDelete}
-            className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            aria-label="Delete note"
-          >
-            <Trash2 size={15} />
+          <button onClick={handleDelete} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-zinc-500 dark:hover:bg-red-500/10 dark:hover:text-red-300" aria-label="Delete note">
+            <Trash2 size={16} />
           </button>
         </header>
 
-        {/* Document Body */}
-        <div className="flex-1 overflow-y-auto px-6 sm:px-12 md:px-20 lg:px-28 py-10 flex flex-col max-w-4xl mx-auto w-full">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => handleChange('title', e.target.value)}
-            placeholder="Untitled"
-            className="w-full bg-transparent text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight border-none outline-none placeholder:text-gray-300 mb-6 leading-tight"
-          />
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10 md:px-16 lg:px-24">
+            <div className="mx-auto flex w-full max-w-3xl flex-col">
+              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
+                <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
+                <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
+                {pinned && <span className="rounded-full bg-gray-950 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-zinc-950">Pinned</span>}
+              </div>
 
-          {/* Tags */}
-          <div className="flex items-center flex-wrap gap-1.5 mb-6">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black/5 text-xs font-medium text-gray-600"
-              >
-                #{tag}
-                <button
-                  onClick={() => handleChange('tags', tags.filter((t) => t !== tag))}
-                  className="ml-0.5 hover:text-red-500 transition-colors"
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }}
-              placeholder="+ tag"
-              className="bg-transparent text-xs text-gray-500 placeholder:text-gray-400 border-none outline-none w-16"
-            />
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleChange('title', e.target.value)}
+                placeholder="Untitled"
+                className="mb-5 w-full border-none bg-transparent text-4xl font-bold leading-tight tracking-tight text-gray-950 outline-none placeholder:text-gray-300 dark:text-zinc-50 dark:placeholder:text-zinc-700 sm:text-5xl"
+              />
+
+              <div className="mb-6 flex flex-wrap items-center gap-1.5">
+                {tags.map((tag) => (
+                  <span key={tag} className="flex items-center gap-1 rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">
+                    #{tag}
+                    <button onClick={() => handleChange('tags', tags.filter((t) => t !== tag))} className="rounded-full p-0.5 transition-colors hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/10 dark:hover:text-red-300" aria-label={`Remove ${tag} tag`}>
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onBlur={() => tagInput.trim() && addTag()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  placeholder="+ tag"
+                  className="w-20 border-none bg-transparent text-xs text-gray-500 outline-none placeholder:text-gray-400 dark:text-zinc-400 dark:placeholder:text-zinc-600"
+                />
+              </div>
+
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={handleContentChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Start writing... type '/' for commands"
+                  className="min-h-[520px] w-full flex-1 resize-none border-none bg-transparent text-[17px] leading-[1.85] text-gray-700 outline-none placeholder:text-gray-300 dark:text-zinc-300 dark:placeholder:text-zinc-700"
+                  spellCheck
+                />
+
+                <AnimatePresence>
+                  {slashOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      transition={{ duration: 0.14 }}
+                      className="absolute left-0 top-10 z-50 w-[min(26rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-zinc-800">
+                        <AlignLeft size={14} className="text-gray-400 dark:text-zinc-500" />
+                        <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Type to filter commands</span>
+                        <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-zinc-800 dark:text-zinc-500">Esc</span>
+                      </div>
+
+                      {filteredCommands.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-zinc-500">No command found for &ldquo;{slashQuery}&rdquo;</div>
+                      ) : (
+                        <div className="max-h-80 overflow-y-auto p-1.5">
+                          {Object.entries(groupedCommands).map(([category, commands]) => (
+                            <div key={category} className="py-1">
+                              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{category}</div>
+                              {commands.map((cmd) => {
+                                const flatIndex = filteredCommands.findIndex((item) => item.id === cmd.id);
+                                const active = activeCommand?.id === cmd.id;
+                                return (
+                                  <button
+                                    key={cmd.id}
+                                    onClick={() => executeSlashCommand(cmd)}
+                                    onMouseEnter={() => setSlashIndex(flatIndex)}
+                                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}
+                                  >
+                                    <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white dark:bg-zinc-950/10 dark:text-zinc-950' : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                                      {cmd.icon}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-sm font-semibold">{cmd.label}</span>
+                                      <span className={`block truncate text-xs ${active ? 'text-white/65 dark:text-zinc-600' : 'text-gray-400 dark:text-zinc-500'}`}>{cmd.description}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
           </div>
 
-          <textarea
-            value={content}
-            onChange={(e) => handleChange('content', e.target.value)}
-            placeholder="Start writing..."
-            className="w-full flex-1 bg-transparent text-[17px] text-gray-700 leading-[1.85] border-none outline-none placeholder:text-gray-300 resize-none min-h-[400px]"
-            spellCheck
-          />
+          <AnimatePresence initial={false}>
+            {previewOpen && (
+              <motion.aside
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 380, opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 240 }}
+                className="hidden min-w-0 border-l border-black/5 bg-white/65 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/70 lg:block"
+              >
+                <div className="flex h-14 items-center gap-2 border-b border-black/5 px-4 text-sm font-semibold text-gray-700 dark:border-white/10 dark:text-zinc-300">
+                  <PanelRight size={16} />
+                  Preview
+                </div>
+                <div className="h-[calc(100%-3.5rem)] overflow-y-auto p-6">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">{renderPreview(content)}</div>
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Status Bar */}
-        <div className="h-10 px-5 flex items-center justify-between text-[11px] font-medium text-gray-400 border-t border-black/5 flex-shrink-0">
+        <div className="flex h-10 flex-shrink-0 items-center justify-between border-t border-black/5 px-5 text-[11px] font-medium text-gray-400 dark:border-white/10 dark:text-zinc-500">
           <div className="flex items-center gap-4">
-            <span>{wordCount} words</span>
             <span>{charCount} chars</span>
+            <span>{content.split('\n').length} lines</span>
           </div>
           <AnimatePresence mode="wait">
             {saveStatus === 'saving' && (
-              <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-gray-500">
+              <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-gray-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gray-400 opacity-75 dark:bg-zinc-500" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-zinc-500" />
                 </span>
                 Saving...
               </motion.span>
             )}
             {saveStatus === 'saved' && (
-              <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-gray-400">
-                ✓ Saved
+              <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-gray-400 dark:text-zinc-500">
+                Saved
               </motion.span>
             )}
           </AnimatePresence>
         </div>
       </motion.div>
 
-      {/* AI Summary Panel */}
       <AnimatePresence>
         {showSummary && (
           <motion.div
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 300, opacity: 1 }}
+            animate={{ width: 320, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="border-l border-gray-100 bg-white dark:bg-zinc-900 h-full flex flex-col shadow-xl flex-shrink-0 overflow-hidden"
+            className="hidden h-full flex-shrink-0 flex-col overflow-hidden border-l border-gray-100 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:flex"
           >
-            <div className="h-12 px-4 flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 min-w-[300px]">
-              <div className="flex items-center gap-2 text-indigo-600 font-semibold text-sm">
-                <Sparkles size={15} /> AI Summary
+            <div className="flex h-14 min-w-[320px] items-center justify-between border-b border-gray-100 px-4 dark:border-zinc-800">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-200">
+                <Sparkles size={15} /> Note insight
               </div>
-              <button onClick={() => setShowSummary(false)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800">
+              <button onClick={() => setShowSummary(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900">
                 <X size={15} />
               </button>
             </div>
-            <div className="p-5 flex-1 overflow-y-auto min-w-[300px]">
+            <div className="min-w-[320px] flex-1 overflow-y-auto p-5">
               {isGeneratingSummary ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-500 font-medium animate-pulse">
-                    <Loader2 size={15} className="animate-spin" /> Analyzing...
+                  <div className="flex animate-pulse items-center gap-2 text-sm font-medium text-gray-500 dark:text-zinc-400">
+                    <Loader2 size={15} className="animate-spin" /> Reading note...
                   </div>
-                  <div className="space-y-2.5 mt-6">
-                    {[3, 4, 3.5, 2.5].map((w, i) => (
-                      <div key={i} className="h-3 bg-gray-100 rounded-full animate-pulse" style={{ width: `${w / 4 * 100}%` }} />
+                  <div className="mt-6 space-y-2.5">
+                    {[88, 75, 92, 58].map((w) => (
+                      <div key={w} className="h-3 rounded-full bg-gray-100 dark:bg-zinc-800" style={{ width: `${w}%` }} />
                     ))}
                   </div>
                 </div>
               ) : (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                  <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm mb-3">Key takeaways</p>
-                  <ul className="space-y-2.5 text-sm text-gray-600 dark:text-gray-400 list-disc pl-4 marker:text-indigo-400 leading-relaxed">
-                    <li>Note focuses on design principles and visual hierarchy.</li>
-                    <li>Key themes include typography, spacing, and color palette.</li>
-                    <li>Contains actionable items for implementation.</li>
-                  </ul>
-                  <div className="mt-6 p-3 bg-indigo-50/60 dark:bg-indigo-900/20 rounded-xl text-xs text-indigo-500 border border-indigo-100/60 dark:border-indigo-800">
-                    Summary generated from document context. Connect an AI API to get real summaries.
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="space-y-5">
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">Writing stats</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Stat label="Words" value={wordCount.toString()} />
+                      <Stat label="Read" value={`${readTime} min`} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-zinc-100">Quick takeaways</p>
+                    <ul className="list-disc space-y-2.5 pl-4 text-sm leading-relaxed text-gray-600 marker:text-gray-300 dark:text-zinc-400 dark:marker:text-zinc-700">
+                      <li>{title ? <>This note is centered on &ldquo;{title}&rdquo;.</> : 'Add a title to give this note a clearer anchor.'}</li>
+                      <li>{tags.length > 0 ? `Tagged with ${tags.map((tag) => `#${tag}`).join(', ')}.` : 'Tags can make this easier to find later.'}</li>
+                      <li>{wordCount > 80 ? 'There is enough text here for a useful summary.' : 'Keep writing to unlock richer summaries.'}</li>
+                    </ul>
                   </div>
                 </motion.div>
               )}
@@ -345,3 +714,20 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
     </div>
   );
 };
+
+function ToolbarButton({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-white hover:text-gray-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" title={label} aria-label={label}>
+      {icon}
+    </button>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-gray-50 p-3 ring-1 ring-gray-100 dark:bg-zinc-900 dark:ring-zinc-800">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{label}</p>
+      <p className="mt-1 text-lg font-bold text-gray-900 dark:text-zinc-100">{value}</p>
+    </div>
+  );
+}

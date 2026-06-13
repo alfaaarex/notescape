@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNotes } from '@/lib/storage';
@@ -152,10 +152,10 @@ export default function Home() {
               {view === 'notes' && showEditor ? (
                 <motion.div
                   key="editor"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                   className="absolute inset-0 flex"
                 >
                   <Editor
@@ -175,10 +175,10 @@ export default function Home() {
               ) : view === 'notes' ? (
                 <motion.div
                   key="grid"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                   className="absolute inset-0 overflow-y-auto"
                 >
                   <NoteGrid
@@ -193,10 +193,10 @@ export default function Home() {
               ) : view === 'tasks' ? (
                 <motion.div
                   key="tasks"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                   className="absolute inset-0 flex flex-col overflow-hidden"
                 >
                   <TaskBoard
@@ -210,10 +210,10 @@ export default function Home() {
               ) : (
                 <motion.div
                   key="calendar"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
                   className="absolute inset-0 flex flex-col overflow-hidden"
                 >
                   <TaskCalendar

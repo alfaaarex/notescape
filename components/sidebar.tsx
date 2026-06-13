@@ -55,6 +55,7 @@ export function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const { user, signOut } = useAuth();
   const userName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const userEmail = user?.email || '';
@@ -65,15 +66,18 @@ export function Sidebar({
     .substring(0, 2)
     .toUpperCase();
 
-  const pinnedNotes = notes.filter((n) => n.pinned);
-  const unpinnedNotes = notes.filter((n) => !n.pinned);
+  const allTags = Array.from(new Set(notes.flatMap((n) => n.tags || []))).sort();
+
+  const pinnedNotes = notes.filter((n) => n.pinned && (!selectedTag || n.tags?.includes(selectedTag)));
+  const unpinnedNotes = notes.filter((n) => !n.pinned && (!selectedTag || n.tags?.includes(selectedTag)));
 
   const filteredNotes =
     searchQuery.trim()
       ? notes.filter(
           (n) =>
-            n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            n.content.toLowerCase().includes(searchQuery.toLowerCase()),
+            (n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            n.content.toLowerCase().includes(searchQuery.toLowerCase())) &&
+            (!selectedTag || n.tags?.includes(selectedTag)),
         )
       : null;
 
@@ -111,22 +115,53 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <div className="px-2 mb-4 flex flex-col gap-0.5">
-        {NAV_ITEMS.map((nav) => (
-          <button
-            key={nav.id}
-            onClick={() => onChangeView(nav.id)}
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
-              activeView === nav.id
-                ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900/60 hover:text-gray-700 dark:hover:text-zinc-300'
-            }`}
-          >
-            {nav.icon}
-            {nav.label}
-          </button>
-        ))}
+      <div className="px-2 mb-4 flex flex-col gap-0.5 relative">
+        {NAV_ITEMS.map((nav) => {
+          const isActive = activeView === nav.id;
+          return (
+            <button
+              key={nav.id}
+              onClick={() => { onChangeView(nav.id); setSelectedTag(null); }}
+              className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 z-10 ${
+                isActive
+                  ? 'text-gray-900 dark:text-gray-100'
+                  : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200'
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+              {nav.icon}
+              {nav.label}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Tags */}
+      {activeView === 'notes' && allTags.length > 0 && (
+        <div className="px-4 mb-4">
+          <div className="flex flex-wrap gap-1.5">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors border ${
+                  selectedTag === tag
+                    ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-100'
+                    : 'bg-transparent text-gray-500 border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Notes List */}
       {activeView === 'notes' && (

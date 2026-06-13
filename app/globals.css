@@ -122,6 +122,69 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Theme Colors */
+:root {
+  --selection-bg: #e0e7ff;
+  --selection-text: inherit;
+}
+
+.dark {
+  --selection-bg: rgba(255, 255, 255, 0.1);
+  --selection-text: inherit;
+}
+
+.theme-slate {
+  --primary: oklch(0.47 0.04 265);
+  --ring: oklch(0.47 0.04 265);
+  --selection-bg: oklch(0.9 0.04 265);
+}
+.theme-rose {
+  --primary: oklch(0.51 0.17 17.5);
+  --ring: oklch(0.51 0.17 17.5);
+  --selection-bg: oklch(0.9 0.08 17.5);
+}
+.theme-indigo {
+  --primary: oklch(0.43 0.15 280);
+  --ring: oklch(0.43 0.15 280);
+  --selection-bg: oklch(0.9 0.08 280);
+}
+.theme-emerald {
+  --primary: oklch(0.55 0.12 150);
+  --ring: oklch(0.55 0.12 150);
+  --selection-bg: oklch(0.9 0.08 150);
+}
+.theme-amber {
+  --primary: oklch(0.65 0.15 65);
+  --ring: oklch(0.65 0.15 65);
+  --selection-bg: oklch(0.9 0.1 65);
+}
+
+.dark.theme-slate {
+  --primary: oklch(0.8 0.04 265);
+  --ring: oklch(0.8 0.04 265);
+  --selection-bg: oklch(0.3 0.04 265);
+}
+.dark.theme-rose {
+  --primary: oklch(0.8 0.1 17.5);
+  --ring: oklch(0.8 0.1 17.5);
+  --selection-bg: oklch(0.3 0.08 17.5);
+}
+.dark.theme-indigo {
+  --primary: oklch(0.8 0.12 280);
+  --ring: oklch(0.8 0.12 280);
+  --selection-bg: oklch(0.3 0.08 280);
+}
+.dark.theme-emerald {
+  --primary: oklch(0.8 0.1 150);
+  --ring: oklch(0.8 0.1 150);
+  --selection-bg: oklch(0.3 0.08 150);
+}
+.dark.theme-amber {
+  --primary: oklch(0.8 0.15 65);
+  --ring: oklch(0.8 0.15 65);
+  --selection-bg: oklch(0.3 0.1 65);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -137,8 +200,8 @@
     scroll-behavior: smooth;
   }
   ::selection {
-    background-color: #e0e7ff;
-    color: #3730a3;
+    background-color: var(--selection-bg);
+    color: var(--selection-text);
   }
   ::-webkit-scrollbar {
     width: 5px;
