@@ -32,6 +32,7 @@ import {
   PinOff,
   Quote,
   RefreshCw,
+  Share,
   Sparkles,
   Strikethrough,
   Tag,
@@ -40,6 +41,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Note } from '@/lib/storage';
+import { supabase } from '@/lib/supabaseClient';
 
 interface EditorProps {
   note: Note | null;
@@ -47,6 +49,7 @@ interface EditorProps {
   onDelete: () => Promise<void>;
   onClose: () => void;
   onTogglePin?: (id: string) => Promise<void>;
+  onTogglePublicShare?: (id: string, isPublic: boolean) => Promise<void>;
 }
 
 const colorMap: Record<string, { label: string; hex: string; ring: string }> = {
@@ -256,7 +259,7 @@ const renderPreview = (text: string) => {
   return elements;
 };
 
-export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorProps) => {
+export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin, onTogglePublicShare }: EditorProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [color, setColor] = useState('alabaster');
@@ -280,6 +283,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
+  const [isPublic, setIsPublic] = useState(false);
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const noteIdRef = useRef<string>(note?.id ?? crypto.randomUUID());
@@ -292,6 +296,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
       setColor(colorMap[note.color] ? note.color : 'alabaster');
       setTags(note.tags ?? []);
       setPinned(note.pinned ?? false);
+      setIsPublic(note.isPublic ?? false);
       noteIdRef.current = note.id;
     } else {
       // Generate a fresh ID immediately so a new note never inherits
@@ -302,6 +307,7 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
       setColor('alabaster');
       setTags([]);
       setPinned(false);
+      setIsPublic(false);
     }
     setSaveStatus('idle');
     setSlashOpen(false);
@@ -309,6 +315,35 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
     setSummaryData(null);
     setSummaryError(null);
   }, [note]);
+
+  // Realtime subscription for the current note
+  useEffect(() => {
+    if (!note?.id) return;
+
+    const channel = supabase
+      .channel(`note_changes_${note.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}` },
+        (payload) => {
+          const newData = payload.new;
+          if (newData) {
+            // Update local state if the incoming update is newer (simple check)
+            // Or just blindly update for now. Usually you'd check updated_at to prevent overwriting local changes if you are the one who triggered it.
+            if (newData.content !== content) setContent(newData.content);
+            if (newData.title !== title) setTitle(newData.title);
+            if (newData.color !== color && colorMap[newData.color]) setColor(newData.color);
+            if (newData.is_public !== isPublic) setIsPublic(newData.is_public);
+            if (newData.pinned !== pinned) setPinned(newData.pinned);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [note?.id, content, title, color, isPublic, pinned]);
 
   const triggerSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -412,6 +447,23 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin }: EditorP
     const newPinned = !pinned;
     setPinned(newPinned);
     if (note?.id && onTogglePin) await onTogglePin(note.id);
+  };
+
+  const handleShareToggle = async () => {
+    const newIsPublic = !isPublic;
+    setIsPublic(newIsPublic);
+    if (note?.id && onTogglePublicShare) {
+      await onTogglePublicShare(note.id, newIsPublic);
+      if (newIsPublic) {
+        const url = `${window.location.origin}/shared/${note.id}`;
+        navigator.clipboard.writeText(url).then(() => {
+          alert('Share link copied to clipboard: ' + url);
+        });
+      }
+    } else if (!note?.id && newIsPublic) {
+      alert('Please save the note first to share it.');
+      setIsPublic(false);
+    }
   };
 
   const handleGenerateSummary = async () => {
@@ -649,6 +701,10 @@ Rules:
 
           <button onClick={handlePinToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${pinned ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={pinned ? 'Unpin' : 'Pin'}>
             {pinned ? <Pin size={15} /> : <PinOff size={15} />}
+          </button>
+
+          <button onClick={handleShareToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${isPublic ? 'bg-blue-600 text-white dark:bg-blue-500 dark:text-white' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={isPublic ? 'Unshare' : 'Share'}>
+            <Share size={15} />
           </button>
 
           <button onClick={handleGenerateSummary} className="hidden items-center gap-1.5 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-zinc-800 sm:flex">

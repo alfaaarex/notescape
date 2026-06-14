@@ -36,6 +36,8 @@ export const useNotes = () => {
               tags: n.tags || [],
               pinned: n.pinned || false,
               updatedAt: n.updated_at,
+              isPublic: n.is_public || false,
+              shareToken: n.share_token || undefined,
             }));
             setNotes(mapped);
           }
@@ -102,6 +104,8 @@ export const useNotes = () => {
           tags: note.tags,
           pinned: note.pinned,
           updated_at: note.updatedAt,
+          is_public: note.isPublic,
+          share_token: note.shareToken,
         });
 
         if (error) {
@@ -167,5 +171,38 @@ export const useNotes = () => {
     [user, persistLocal],
   );
 
-  return { notes, loading, saveNote, deleteNote, togglePin };
+  const togglePublicShare = useCallback(
+    async (id: string, isPublic: boolean) => {
+      let updatedNote: Note | undefined;
+
+      setNotes((prev) => {
+        const next = prev.map((n) => {
+          if (n.id === id) {
+            updatedNote = { ...n, isPublic, updatedAt: Date.now() };
+            return updatedNote;
+          }
+          return n;
+        });
+        if (!user) {
+          persistLocal(next);
+        }
+        return next;
+      });
+
+      if (user && updatedNote) {
+        const { error } = await supabase
+          .from('notes')
+          .update({ is_public: isPublic, updated_at: updatedNote.updatedAt })
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error toggling share state in Supabase:', error);
+          throw error;
+        }
+      }
+    },
+    [user, persistLocal],
+  );
+
+  return { notes, loading, saveNote, deleteNote, togglePin, togglePublicShare };
 };

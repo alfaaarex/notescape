@@ -21,7 +21,7 @@ import { Menu, X } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
-  const { notes, loading: notesLoading, saveNote, deleteNote, togglePin } = useNotes();
+  const { notes, loading: notesLoading, saveNote, deleteNote, togglePin, togglePublicShare } = useNotes();
   const { tasks, loading: tasksLoading, saveTask, deleteTask, updateTaskStatus } = useTasks();
 
   const [view, setView]                       = useState<SidebarView>('notes');
@@ -181,6 +181,7 @@ export default function Home() {
                     }}
                     onClose={() => setSelectedNoteId(null)}
                     onTogglePin={togglePin}
+                    onTogglePublicShare={togglePublicShare}
                   />
                 </motion.div>
               ) : view === 'notes' ? (

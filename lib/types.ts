@@ -11,6 +11,17 @@ export interface Note {
   tags: string[];
   pinned: boolean;
   updatedAt: number;
+  isPublic?: boolean;
+  shareToken?: string;
+}
+
+export type CollaboratorRole = 'viewer' | 'editor';
+
+export interface Collaborator {
+  noteId: string;
+  userId: string;
+  role: CollaboratorRole;
+  createdAt: string;
 }
 
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
