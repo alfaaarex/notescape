@@ -17,11 +17,19 @@ export interface Note {
 
 export type CollaboratorRole = 'viewer' | 'editor';
 
+export interface Profile {
+  id: string;
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
 export interface Collaborator {
   noteId: string;
   userId: string;
   role: CollaboratorRole;
   createdAt: string;
+  profile?: Profile;
 }
 
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';

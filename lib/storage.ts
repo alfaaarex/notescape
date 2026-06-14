@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Note } from './types';
+import type { Note, Collaborator, CollaboratorRole } from './types';
 import { supabase } from './supabaseClient';
 import { useAuth } from '@/components/auth-provider';
 
@@ -204,5 +204,97 @@ export const useNotes = () => {
     [user, persistLocal],
   );
 
-  return { notes, loading, saveNote, deleteNote, togglePin, togglePublicShare };
+  const getCollaborators = useCallback(async (noteId: string): Promise<Collaborator[]> => {
+    if (!user) return [];
+    const { data, error } = await supabase
+      .from('note_collaborators')
+      .select('*, profiles(*)')
+      .eq('note_id', noteId);
+    
+    if (error) {
+      console.error('Error fetching collaborators:', error);
+      return [];
+    }
+    
+    return data.map((c: any) => ({
+      noteId: c.note_id,
+      userId: c.user_id,
+      role: c.role,
+      createdAt: c.created_at,
+      profile: c.profiles ? {
+        id: c.profiles.id,
+        email: c.profiles.email,
+        fullName: c.profiles.full_name,
+        avatarUrl: c.profiles.avatar_url,
+      } : undefined,
+    }));
+  }, [user]);
+
+  const addCollaborator = useCallback(async (noteId: string, email: string, role: CollaboratorRole) => {
+    if (!user) return { error: 'Not authenticated' };
+    
+    // First find the user by email in profiles
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .limit(1);
+      
+    if (profileError || !profiles || profiles.length === 0) {
+      return { error: 'User not found' };
+    }
+    
+    const targetUserId = profiles[0].id;
+    if (targetUserId === user.id) {
+      return { error: 'Cannot add yourself as a collaborator' };
+    }
+
+    const { error } = await supabase
+      .from('note_collaborators')
+      .insert({ note_id: noteId, user_id: targetUserId, role });
+      
+    if (error) {
+      console.error('Error adding collaborator:', error);
+      return { error: 'Failed to add collaborator' };
+    }
+    
+    return { success: true };
+  }, [user]);
+
+  const removeCollaborator = useCallback(async (noteId: string, targetUserId: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('note_collaborators')
+      .delete()
+      .match({ note_id: noteId, user_id: targetUserId });
+      
+    if (error) {
+      console.error('Error removing collaborator:', error);
+    }
+  }, [user]);
+
+  const updateCollaborator = useCallback(async (noteId: string, targetUserId: string, role: CollaboratorRole) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('note_collaborators')
+      .update({ role })
+      .match({ note_id: noteId, user_id: targetUserId });
+      
+    if (error) {
+      console.error('Error updating collaborator:', error);
+    }
+  }, [user]);
+
+  return { 
+    notes, 
+    loading, 
+    saveNote, 
+    deleteNote, 
+    togglePin, 
+    togglePublicShare,
+    getCollaborators,
+    addCollaborator,
+    removeCollaborator,
+    updateCollaborator
+  };
 };

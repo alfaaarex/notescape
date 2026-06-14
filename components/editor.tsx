@@ -41,7 +41,10 @@ import {
   X,
 } from 'lucide-react';
 import type { Note } from '@/lib/storage';
+import type { Collaborator, CollaboratorRole, Profile } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
+import { ShareSheet } from '@/components/share-sheet';
+import { useAuth } from '@/components/auth-provider';
 
 interface EditorProps {
   note: Note | null;
@@ -50,6 +53,10 @@ interface EditorProps {
   onClose: () => void;
   onTogglePin?: (id: string) => Promise<void>;
   onTogglePublicShare?: (id: string, isPublic: boolean) => Promise<void>;
+  getCollaborators?: (noteId: string) => Promise<Collaborator[]>;
+  addCollaborator?: (noteId: string, email: string, role: CollaboratorRole) => Promise<{ error?: string; success?: boolean }>;
+  removeCollaborator?: (noteId: string, userId: string) => Promise<void>;
+  updateCollaborator?: (noteId: string, userId: string, role: CollaboratorRole) => Promise<void>;
 }
 
 const colorMap: Record<string, { label: string; hex: string; ring: string }> = {
@@ -259,7 +266,18 @@ const renderPreview = (text: string) => {
   return elements;
 };
 
-export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin, onTogglePublicShare }: EditorProps) => {
+export const Editor = ({ 
+  note, 
+  onSave, 
+  onDelete, 
+  onClose, 
+  onTogglePin, 
+  onTogglePublicShare,
+  getCollaborators,
+  addCollaborator,
+  removeCollaborator,
+  updateCollaborator
+}: EditorProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [color, setColor] = useState('alabaster');
@@ -284,6 +302,10 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin, onToggleP
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [presentUsers, setPresentUsers] = useState<Record<string, any>>({});
+  
+  const { user } = useAuth();
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const noteIdRef = useRef<string>(note?.id ?? crypto.randomUUID());
@@ -344,6 +366,41 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin, onToggleP
       supabase.removeChannel(channel);
     };
   }, [note?.id, content, title, color, isPublic, pinned]);
+
+  useEffect(() => {
+    if (!note?.id || !user) return;
+
+    const presenceChannel = supabase.channel(`note_presence_${note.id}`, {
+      config: {
+        presence: { key: user.id },
+      },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const users: Record<string, any> = {};
+        for (const id in state) {
+          // state[id] is an array of presences for that key
+          users[id] = state[id][0];
+        }
+        setPresentUsers(users);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            id: user.id,
+            email: user.email,
+            fullName: user.user_metadata?.full_name,
+            avatarUrl: user.user_metadata?.avatar_url,
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [note?.id, user]);
 
   const triggerSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -449,21 +506,12 @@ export const Editor = ({ note, onSave, onDelete, onClose, onTogglePin, onToggleP
     if (note?.id && onTogglePin) await onTogglePin(note.id);
   };
 
-  const handleShareToggle = async () => {
-    const newIsPublic = !isPublic;
-    setIsPublic(newIsPublic);
-    if (note?.id && onTogglePublicShare) {
-      await onTogglePublicShare(note.id, newIsPublic);
-      if (newIsPublic) {
-        const url = `${window.location.origin}/shared/${note.id}`;
-        navigator.clipboard.writeText(url).then(() => {
-          alert('Share link copied to clipboard: ' + url);
-        });
-      }
-    } else if (!note?.id && newIsPublic) {
+  const handleShareToggle = () => {
+    if (!note?.id) {
       alert('Please save the note first to share it.');
-      setIsPublic(false);
+      return;
     }
+    setShareSheetOpen(true);
   };
 
   const handleGenerateSummary = async () => {
@@ -703,7 +751,26 @@ Rules:
             {pinned ? <Pin size={15} /> : <PinOff size={15} />}
           </button>
 
-          <button onClick={handleShareToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${isPublic ? 'bg-blue-600 text-white dark:bg-blue-500 dark:text-white' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={isPublic ? 'Unshare' : 'Share'}>
+          <div className="flex items-center gap-1.5 mr-2">
+            {Object.values(presentUsers).map((u) => (
+              <div 
+                key={u.id} 
+                className="group relative flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 ring-2 ring-[var(--note-bg)] dark:ring-zinc-950"
+                style={{ '--note-bg': bgHex } as React.CSSProperties}
+              >
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} alt={u.fullName || u.email} className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold text-indigo-700">{u.email?.charAt(0).toUpperCase() || '?'}</span>
+                )}
+                <div className="absolute top-full z-50 mt-1 hidden whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:block group-hover:opacity-100 dark:bg-zinc-800">
+                  {u.fullName || u.email}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={handleShareToggle} className={`hidden rounded-lg p-2 transition-colors sm:block text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100`} aria-label="Share">
             <Share size={15} />
           </button>
 
@@ -867,6 +934,21 @@ Rules:
           </AnimatePresence>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {shareSheetOpen && note?.id && onTogglePublicShare && getCollaborators && addCollaborator && removeCollaborator && updateCollaborator && (
+          <ShareSheet
+            noteId={note.id}
+            isPublic={isPublic}
+            onTogglePublicShare={onTogglePublicShare}
+            getCollaborators={getCollaborators}
+            addCollaborator={addCollaborator}
+            removeCollaborator={removeCollaborator}
+            updateCollaborator={updateCollaborator}
+            onClose={() => setShareSheetOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showSummary && (
