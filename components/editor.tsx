@@ -443,7 +443,9 @@ export const Editor = ({
         setSaveStatus('saved');
       } catch (err) {
         console.error('Failed to save note:', err);
-        setSaveStatus('idle');
+        setSaveStatus('error' as any);
+        // Reset to idle after 3s so user can keep typing
+        setTimeout(() => setSaveStatus('idle'), 3000);
       }
     }, 650);
   }, [title, content, color, tags, pinned, isPublic, onSave]);
@@ -462,7 +464,7 @@ export const Editor = ({
   useEffect(() => {
     if (!title && !content) return;
     triggerSave();
-  }, [title, content, color, tags, pinned, triggerSave]);
+  }, [title, content, color, tags, pinned, isPublic, triggerSave]);
 
   useEffect(() => () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);

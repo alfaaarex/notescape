@@ -94,7 +94,9 @@ export const useNotes = () => {
 
       // Sync with Supabase
       if (user) {
-        const { error } = await supabase.from('notes').upsert({
+        // Build the upsert payload — omit share_token if it's undefined
+        // so Supabase uses the column's gen_random_uuid() default on insert.
+        const payload: Record<string, unknown> = {
           id: note.id,
           user_id: user.id,
           title: note.title,
@@ -104,12 +106,17 @@ export const useNotes = () => {
           tags: note.tags,
           pinned: note.pinned,
           updated_at: note.updatedAt,
-          is_public: note.isPublic,
-          share_token: note.shareToken,
-        });
+          is_public: note.isPublic ?? false,
+        };
+        // Only include share_token when it's a real value
+        if (note.shareToken) {
+          payload.share_token = note.shareToken;
+        }
+
+        const { error } = await supabase.from('notes').upsert(payload);
 
         if (error) {
-          console.error('Error saving note to Supabase:', error);
+          console.error('Error saving note to Supabase:', error.message, error.details, error.hint);
           throw error;
         }
       }
