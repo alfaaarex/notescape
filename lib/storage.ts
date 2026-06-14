@@ -185,13 +185,13 @@ export const useNotes = () => {
   );
 
   const togglePublicShare = useCallback(
-    async (id: string, isPublic: boolean) => {
+    async (id: string, isPublic: boolean, shareSlug?: string) => {
       let updatedNote: Note | undefined;
 
       setNotes((prev) => {
         const next = prev.map((n) => {
           if (n.id === id) {
-            updatedNote = { ...n, isPublic, updatedAt: Date.now() };
+            updatedNote = { ...n, isPublic, shareSlug: shareSlug ?? n.shareSlug, updatedAt: Date.now() };
             return updatedNote;
           }
           return n;
@@ -203,9 +203,11 @@ export const useNotes = () => {
       });
 
       if (user && updatedNote) {
+        const patch: Record<string, unknown> = { is_public: isPublic, updated_at: updatedNote.updatedAt };
+        if (shareSlug) patch.share_slug = shareSlug;
         const { error } = await supabase
           .from('notes')
-          .update({ is_public: isPublic, updated_at: updatedNote.updatedAt })
+          .update(patch)
           .eq('id', id);
 
         if (error) {
@@ -219,9 +221,10 @@ export const useNotes = () => {
 
   const getCollaborators = useCallback(async (noteId: string): Promise<Collaborator[]> => {
     if (!user) return [];
+    // Use explicit join syntax — note_collaborators.user_id → profiles.id
     const { data, error } = await supabase
       .from('note_collaborators')
-      .select('*, profiles(*)')
+      .select('note_id, user_id, role, created_at, profiles:user_id(id, email, full_name, avatar_url)')
       .eq('note_id', noteId);
     
     if (error) {
@@ -229,18 +232,22 @@ export const useNotes = () => {
       return [];
     }
     
-    return data.map((c: any) => ({
-      noteId: c.note_id,
-      userId: c.user_id,
-      role: c.role,
-      createdAt: c.created_at,
-      profile: c.profiles ? {
-        id: c.profiles.id,
-        email: c.profiles.email,
-        fullName: c.profiles.full_name,
-        avatarUrl: c.profiles.avatar_url,
-      } : undefined,
-    }));
+    return (data || []).map((c: any) => {
+      // profiles may be an object or array depending on Supabase version
+      const p = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+      return {
+        noteId: c.note_id,
+        userId: c.user_id,
+        role: c.role,
+        createdAt: c.created_at,
+        profile: p ? {
+          id: p.id,
+          email: p.email,
+          fullName: p.full_name,
+          avatarUrl: p.avatar_url,
+        } : undefined,
+      };
+    });
   }, [user]);
 
   const addCollaborator = useCallback(async (noteId: string, email: string, role: CollaboratorRole) => {
@@ -304,7 +311,7 @@ export const useNotes = () => {
     saveNote, 
     deleteNote, 
     togglePin, 
-    togglePublicShare,
+    togglePublicShare: togglePublicShare as (id: string, isPublic: boolean, shareSlug?: string) => Promise<void>,
     getCollaborators,
     addCollaborator,
     removeCollaborator,

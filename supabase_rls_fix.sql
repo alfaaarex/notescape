@@ -125,6 +125,7 @@ DROP POLICY IF EXISTS "Note owners can add collaborators"       ON note_collabor
 DROP POLICY IF EXISTS "Note owners can update collaborators"    ON note_collaborators;
 DROP POLICY IF EXISTS "Note owners can remove collaborators"    ON note_collaborators;
 DROP POLICY IF EXISTS "Collaborators can view own entry"        ON note_collaborators;
+DROP POLICY IF EXISTS "Collaborators can view all collaborators on shared notes" ON note_collaborators;
 
 ALTER TABLE note_collaborators ENABLE ROW LEVEL SECURITY;
 
@@ -137,6 +138,27 @@ CREATE POLICY "Note owners can view collaborators" ON note_collaborators
 CREATE POLICY "Collaborators can view own entry" ON note_collaborators
     FOR SELECT
     USING (auth.uid() = user_id);
+
+-- Collaborators can see ALL collaborators on notes they have access to
+-- (enables the full collaborator list to render for non-owners)
+-- Uses get_note_owner() via a helper to avoid recursion; the check here is:
+-- "is the current user a collaborator on this note?" without querying notes under RLS.
+CREATE OR REPLACE FUNCTION public.is_note_collaborator(p_note_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM note_collaborators
+    WHERE note_id = p_note_id AND user_id = p_user_id
+  );
+$$;
+
+CREATE POLICY "Collaborators can view all collaborators on shared notes" ON note_collaborators
+    FOR SELECT
+    USING (public.is_note_collaborator(note_id, auth.uid()));
 
 -- Only note owners can add collaborators
 CREATE POLICY "Note owners can add collaborators" ON note_collaborators

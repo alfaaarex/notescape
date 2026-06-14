@@ -52,7 +52,7 @@ interface EditorProps {
   onDelete: () => Promise<void>;
   onClose: () => void;
   onTogglePin?: (id: string) => Promise<void>;
-  onTogglePublicShare?: (id: string, isPublic: boolean) => Promise<void>;
+  onTogglePublicShare?: (id: string, isPublic: boolean, shareSlug?: string) => Promise<void>;
   getCollaborators?: (noteId: string) => Promise<Collaborator[]>;
   addCollaborator?: (noteId: string, email: string, role: CollaboratorRole) => Promise<{ error?: string; success?: boolean }>;
   removeCollaborator?: (noteId: string, userId: string) => Promise<void>;
@@ -1025,11 +1025,8 @@ Rules:
             isPublic={isPublic}
             shareSlug={note.shareSlug}
             onTogglePublicShare={async (id, pub, slug) => {
-              await onTogglePublicShare(id, pub);
-              // If a slug was generated, persist it via a save
-              if (slug && note) {
-                await onSave({ ...note, title, content, color, tags, pinned, isPublic: pub, shareSlug: slug, updatedAt: Date.now() });
-              }
+              // Pass slug directly to togglePublicShare so it's persisted atomically
+              await onTogglePublicShare(id, pub, slug);
             }}
             getCollaborators={getCollaborators}
             addCollaborator={addCollaborator}

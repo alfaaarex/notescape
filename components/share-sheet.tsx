@@ -79,6 +79,7 @@ export function ShareSheet({
 }: ShareSheetProps) {
   const { user } = useAuth();
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [ownerProfile, setOwnerProfile] = useState<{ email?: string; fullName?: string; avatarUrl?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<CollaboratorRole>('editor');
@@ -93,6 +94,27 @@ export function ShareSheet({
 
   useEffect(() => { loadCollaborators(); }, [noteId]);
   useEffect(() => { setActiveSlug(shareSlug || ''); }, [shareSlug]);
+
+  // Fetch owner profile (may differ from current user if viewer/editor opens the sheet)
+  useEffect(() => {
+    if (!noteOwnerId) return;
+    if (noteOwnerId === user?.id) {
+      setOwnerProfile({
+        email: user.email,
+        fullName: user.user_metadata?.full_name,
+        avatarUrl: user.user_metadata?.avatar_url,
+      });
+      return;
+    }
+    supabase
+      .from('profiles')
+      .select('email, full_name, avatar_url')
+      .eq('id', noteOwnerId)
+      .single()
+      .then(({ data }) => {
+        if (data) setOwnerProfile({ email: data.email, fullName: data.full_name, avatarUrl: data.avatar_url });
+      });
+  }, [noteOwnerId, user]);
 
   const loadCollaborators = async () => {
     setLoading(true);
@@ -291,15 +313,17 @@ export function ShareSheet({
               {noteOwnerId && (
                 <div className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-2.5">
-                    <Avatar profile={{ id: noteOwnerId, email: user?.email, avatarUrl: user?.user_metadata?.avatar_url, fullName: user?.user_metadata?.full_name }} size={8} />
+                    <Avatar profile={{ id: noteOwnerId, email: ownerProfile?.email, avatarUrl: ownerProfile?.avatarUrl, fullName: ownerProfile?.fullName }} size={8} />
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-zinc-200">
-                        {user?.user_metadata?.full_name || user?.email}
+                        {ownerProfile?.fullName || ownerProfile?.email || '…'}
                         {user?.id === noteOwnerId && (
                           <span className="ml-1.5 text-[10px] text-gray-400 dark:text-zinc-500">(you)</span>
                         )}
                       </p>
-                      <p className="text-xs text-gray-400 dark:text-zinc-500">{user?.email}</p>
+                      {ownerProfile?.email && ownerProfile?.fullName && (
+                        <p className="text-xs text-gray-400 dark:text-zinc-500">{ownerProfile.email}</p>
+                      )}
                     </div>
                   </div>
                   <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
