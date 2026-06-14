@@ -4,6 +4,7 @@
 
 export interface Note {
   id: string;
+  userId?: string;
   title: string;
   content: string;
   color: string;
@@ -13,6 +14,7 @@ export interface Note {
   updatedAt: number;
   isPublic?: boolean;
   shareToken?: string;
+  shareSlug?: string;
 }
 
 export type CollaboratorRole = 'viewer' | 'editor';

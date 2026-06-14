@@ -29,6 +29,7 @@ export const useNotes = () => {
             // Map table fields to Note interface
             const mapped: Note[] = data.map((n: any) => ({
               id: n.id,
+              userId: n.user_id,
               title: n.title,
               content: n.content,
               color: n.color,
@@ -38,6 +39,7 @@ export const useNotes = () => {
               updatedAt: n.updated_at,
               isPublic: n.is_public || false,
               shareToken: n.share_token || undefined,
+              shareSlug: n.share_slug || undefined,
             }));
             setNotes(mapped);
           }
@@ -111,6 +113,10 @@ export const useNotes = () => {
         // Only include share_token when it's a real value
         if (note.shareToken) {
           payload.share_token = note.shareToken;
+        }
+        // Assign a short slug when one is provided
+        if (note.shareSlug) {
+          payload.share_slug = note.shareSlug;
         }
 
         const { error } = await supabase.from('notes').upsert(payload);

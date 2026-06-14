@@ -387,44 +387,87 @@ export const Editor = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
+  // Broadcast ref so we can send typing events from triggerSave without re-subscribing
+  const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // Typing indicators: map of userId -> { email, fullName, avatarUrl, at: timestamp }
+  const [typingUsers, setTypingUsers] = useState<Record<string, any>>({});
+
+  // Combined presence + broadcast channel for live collaboration
   useEffect(() => {
     if (!note?.id || !user) return;
 
-    const presenceChannel = supabase.channel(`note_presence_${note.id}`, {
-      config: {
-        presence: { key: user.id },
-      },
+    const colabChannel = supabase.channel(`collab_${note.id}`, {
+      config: { presence: { key: user.id } },
     });
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const users: Record<string, any> = {};
-        for (const id in state) {
-          // state[id] is an array of presences for that key
-          users[id] = state[id][0];
+    broadcastChannelRef.current = colabChannel;
+
+    // Presence: who is viewing/editing right now
+    colabChannel.on('presence', { event: 'sync' }, () => {
+      const state = colabChannel.presenceState();
+      const users: Record<string, any> = {};
+      for (const id in state) {
+        users[id] = (state[id] as any[])[0];
+      }
+      setPresentUsers(users);
+    });
+
+    // Broadcast: live typing events from other editors
+    colabChannel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (!payload || payload.userId === user.id) return;
+      setTypingUsers((prev) => ({
+        ...prev,
+        [payload.userId]: { ...payload, at: Date.now() },
+      }));
+    });
+
+    colabChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await colabChannel.track({
+          id: user.id,
+          email: user.email,
+          fullName: user.user_metadata?.full_name,
+          avatarUrl: user.user_metadata?.avatar_url,
+        });
+      }
+    });
+
+    // Prune stale typing indicators every 2s
+    const pruneInterval = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const next = { ...prev };
+        let changed = false;
+        for (const uid in next) {
+          if (now - next[uid].at > 3000) { delete next[uid]; changed = true; }
         }
-        setPresentUsers(users);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            id: user.id,
-            email: user.email,
-            fullName: user.user_metadata?.full_name,
-            avatarUrl: user.user_metadata?.avatar_url,
-          });
-        }
+        return changed ? next : prev;
       });
+    }, 2000);
 
     return () => {
-      supabase.removeChannel(presenceChannel);
+      broadcastChannelRef.current = null;
+      supabase.removeChannel(colabChannel);
+      clearInterval(pruneInterval);
     };
   }, [note?.id, user]);
 
   const triggerSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     setSaveStatus('saving');
+    // Broadcast that this user is actively typing
+    if (broadcastChannelRef.current && user) {
+      broadcastChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          userId: user.id,
+          email: user.email,
+          fullName: user.user_metadata?.full_name,
+          avatarUrl: user.user_metadata?.avatar_url,
+        },
+      });
+    }
     saveTimeoutRef.current = setTimeout(async () => {
       const now = Date.now();
       lastSavedAtRef.current = now;
@@ -776,23 +819,37 @@ Rules:
             {pinned ? <Pin size={15} /> : <PinOff size={15} />}
           </button>
 
-          <div className="flex items-center gap-1.5 mr-2">
-            {Object.values(presentUsers).map((u) => (
-              <div 
-                key={u.id} 
-                className="group relative flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 ring-2 ring-[var(--note-bg)] dark:ring-zinc-950"
-                style={{ '--note-bg': bgHex } as React.CSSProperties}
-              >
-                {u.avatarUrl ? (
-                  <img src={u.avatarUrl} alt={u.fullName || u.email} className="h-full w-full rounded-full object-cover" />
-                ) : (
-                  <span className="text-[10px] font-bold text-indigo-700">{u.email?.charAt(0).toUpperCase() || '?'}</span>
-                )}
-                <div className="absolute top-full z-50 mt-1 hidden whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 transition-opacity group-hover:block group-hover:opacity-100 dark:bg-zinc-800">
-                  {u.fullName || u.email}
+          <div className="flex items-center gap-1 mr-2">
+            {Object.values(presentUsers).filter((u) => u.id !== user?.id).map((u) => {
+              const isTyping = !!typingUsers[u.id];
+              // Deterministic avatar color
+              const palette = ['bg-rose-400','bg-orange-400','bg-amber-400','bg-emerald-500','bg-teal-500','bg-sky-500','bg-indigo-500','bg-violet-500','bg-pink-500'];
+              let h = 0; for (let i = 0; i < (u.id||'').length; i++) h = (h * 31 + (u.id||'').charCodeAt(i)) >>> 0;
+              const avatarBg = palette[h % palette.length];
+              return (
+                <div
+                  key={u.id}
+                  className="group relative flex h-7 w-7 items-center justify-center rounded-full ring-2 ring-white dark:ring-zinc-900"
+                >
+                  {u.avatarUrl ? (
+                    <img src={u.avatarUrl} alt={u.fullName || u.email} className="h-full w-full rounded-full object-cover" />
+                  ) : (
+                    <div className={`h-full w-full rounded-full ${avatarBg} flex items-center justify-center`}>
+                      <span className="text-[10px] font-bold text-white">{(u.email||'?').charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                  {isTyping && (
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-500 ring-1 ring-white dark:ring-zinc-900">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    </span>
+                  )}
+                  <div className="absolute top-full z-50 mt-1.5 hidden whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1.5 text-[10px] text-white shadow-lg group-hover:block dark:bg-zinc-800 pointer-events-none">
+                    <p className="font-semibold">{u.fullName || u.email}</p>
+                    {isTyping && <p className="text-emerald-400">editing now...</p>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button onClick={handleShareToggle} className={`hidden rounded-lg p-2 transition-colors sm:block text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100`} aria-label="Share">
@@ -964,8 +1021,16 @@ Rules:
         {shareSheetOpen && note?.id && onTogglePublicShare && getCollaborators && addCollaborator && removeCollaborator && updateCollaborator && (
           <ShareSheet
             noteId={note.id}
+            noteOwnerId={note.userId}
             isPublic={isPublic}
-            onTogglePublicShare={onTogglePublicShare}
+            shareSlug={note.shareSlug}
+            onTogglePublicShare={async (id, pub, slug) => {
+              await onTogglePublicShare(id, pub);
+              // If a slug was generated, persist it via a save
+              if (slug && note) {
+                await onSave({ ...note, title, content, color, tags, pinned, isPublic: pub, shareSlug: slug, updatedAt: Date.now() });
+              }
+            }}
             getCollaborators={getCollaborators}
             addCollaborator={addCollaborator}
             removeCollaborator={removeCollaborator}
