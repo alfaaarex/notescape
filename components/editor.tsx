@@ -310,6 +310,8 @@ export const Editor = ({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const noteIdRef = useRef<string>(note?.id ?? crypto.randomUUID());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Tracks the last time we sent a save so we can ignore our own realtime echo
+  const lastSavedAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (note) {
@@ -339,6 +341,20 @@ export const Editor = ({
   }, [note]);
 
   // Realtime subscription for the current note
+  // Dependency array is ONLY note?.id — we don't want to re-subscribe on every keystroke.
+  // We use refs to read the latest state values inside the callback without re-subscribing.
+  const contentRef = useRef(content);
+  const titleRef = useRef(title);
+  const colorRef = useRef(color);
+  const isPublicRef = useRef(isPublic);
+  const pinnedRef = useRef(pinned);
+
+  useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { colorRef.current = color; }, [color]);
+  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
+  useEffect(() => { pinnedRef.current = pinned; }, [pinned]);
+
   useEffect(() => {
     if (!note?.id) return;
 
@@ -348,16 +364,19 @@ export const Editor = ({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}` },
         (payload) => {
-          const newData = payload.new;
-          if (newData) {
-            // Update local state if the incoming update is newer (simple check)
-            // Or just blindly update for now. Usually you'd check updated_at to prevent overwriting local changes if you are the one who triggered it.
-            if (newData.content !== content) setContent(newData.content);
-            if (newData.title !== title) setTitle(newData.title);
-            if (newData.color !== color && colorMap[newData.color]) setColor(newData.color);
-            if (newData.is_public !== isPublic) setIsPublic(newData.is_public);
-            if (newData.pinned !== pinned) setPinned(newData.pinned);
-          }
+          const newData = payload.new as any;
+          if (!newData) return;
+
+          // Ignore our own echoed saves (within a 3-second window)
+          const remoteTs = newData.updated_at;
+          if (remoteTs && Math.abs(remoteTs - lastSavedAtRef.current) < 3000) return;
+
+          // Only update fields that actually changed vs current local state
+          if (newData.content !== contentRef.current) setContent(newData.content ?? '');
+          if (newData.title !== titleRef.current) setTitle(newData.title ?? '');
+          if (colorMap[newData.color] && newData.color !== colorRef.current) setColor(newData.color);
+          if (newData.is_public !== isPublicRef.current) setIsPublic(newData.is_public);
+          if (newData.pinned !== pinnedRef.current) setPinned(newData.pinned);
         }
       )
       .subscribe();
@@ -365,7 +384,8 @@ export const Editor = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [note?.id, content, title, color, isPublic, pinned]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.id]);
 
   useEffect(() => {
     if (!note?.id || !user) return;
@@ -406,6 +426,8 @@ export const Editor = ({
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     setSaveStatus('saving');
     saveTimeoutRef.current = setTimeout(async () => {
+      const now = Date.now();
+      lastSavedAtRef.current = now;
       try {
         await onSave({
           id: noteIdRef.current,
@@ -414,8 +436,9 @@ export const Editor = ({
           color,
           tags,
           pinned,
+          isPublic,
           summary: content.slice(0, 140),
-          updatedAt: Date.now(),
+          updatedAt: now,
         });
         setSaveStatus('saved');
       } catch (err) {
@@ -423,7 +446,7 @@ export const Editor = ({
         setSaveStatus('idle');
       }
     }, 650);
-  }, [title, content, color, tags, pinned, onSave]);
+  }, [title, content, color, tags, pinned, isPublic, onSave]);
 
   const handleChange = useCallback((field: 'title' | 'content' | 'color' | 'tags', value: string | string[]) => {
     if (field === 'title') setTitle(value as string);
