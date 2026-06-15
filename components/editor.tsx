@@ -343,7 +343,7 @@ export const Editor = ({
     setShowMobileMore(false);
     setSummaryData(null);
     setSummaryError(null);
-  }, [note]);
+  }, [note?.id]);
 
   // Realtime subscription for the current note
   // Dependency array is ONLY note?.id — we don't want to re-subscribe on every keystroke.
