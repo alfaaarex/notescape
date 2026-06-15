@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Link as LinkIcon, UserPlus, Loader2, UserCircle2,
-  Check, Copy, Globe, Lock, Crown, Eye, Pencil, ChevronDown,
+  Check, Copy, Globe, Lock, Crown, Eye, Pencil, ChevronDown, Trash2,
 } from 'lucide-react';
 import type { Collaborator, CollaboratorRole } from '@/lib/types';
 import { useAuth } from '@/components/auth-provider';
@@ -361,48 +361,49 @@ export function ShareSheet({
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {/* Role badge / dropdown */}
+                        {/* Role badge / dropdown + explicit remove button */}
                         {isOwner && c.userId !== user?.id ? (
-                          <div className="relative">
+                          <>
+                            <div className="relative">
+                              <button
+                                onClick={() => setOpenRoleMenu(openRoleMenu === c.userId ? null : c.userId)}
+                                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${ROLE_COLORS[c.role]} hover:opacity-80`}
+                              >
+                                {ROLE_ICONS[c.role]}
+                                {c.role.charAt(0).toUpperCase() + c.role.slice(1)}
+                                <ChevronDown size={9} />
+                              </button>
+                              <AnimatePresence>
+                                {openRoleMenu === c.userId && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                    className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-xl border border-gray-100 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800 overflow-hidden"
+                                  >
+                                    {(['editor', 'viewer'] as CollaboratorRole[]).map((role) => (
+                                      <button
+                                        key={role}
+                                        onClick={() => handleRoleChange(c.userId, role)}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-zinc-700 ${c.role === role ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-zinc-300'}`}
+                                      >
+                                        {ROLE_ICONS[role]}
+                                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                                        {c.role === role && <Check size={10} className="ml-auto" />}
+                                      </button>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
                             <button
-                              onClick={() => setOpenRoleMenu(openRoleMenu === c.userId ? null : c.userId)}
-                              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors ${ROLE_COLORS[c.role]} hover:opacity-80`}
+                              onClick={() => handleRemove(c.userId)}
+                              title="Remove access"
+                              className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-zinc-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                             >
-                              {ROLE_ICONS[c.role]}
-                              {c.role.charAt(0).toUpperCase() + c.role.slice(1)}
-                              <ChevronDown size={9} />
+                              <Trash2 size={13} />
                             </button>
-                            <AnimatePresence>
-                              {openRoleMenu === c.userId && (
-                                <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                                  className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-xl border border-gray-100 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800 overflow-hidden"
-                                >
-                                  {(['editor', 'viewer'] as CollaboratorRole[]).map((role) => (
-                                    <button
-                                      key={role}
-                                      onClick={() => handleRoleChange(c.userId, role)}
-                                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-zinc-700 ${c.role === role ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-zinc-300'}`}
-                                    >
-                                      {ROLE_ICONS[role]}
-                                      {role.charAt(0).toUpperCase() + role.slice(1)}
-                                      {c.role === role && <Check size={10} className="ml-auto" />}
-                                    </button>
-                                  ))}
-                                  <div className="border-t border-gray-100 dark:border-zinc-700">
-                                    <button
-                                      onClick={() => { setOpenRoleMenu(null); handleRemove(c.userId); }}
-                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                    >
-                                      <X size={10} /> Remove
-                                    </button>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
+                          </>
                         ) : (
                           <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[c.role]}`}>
                             {ROLE_ICONS[c.role]}
