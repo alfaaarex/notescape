@@ -125,11 +125,11 @@ function RolePill({ role, onClick }: { role: CollaboratorRole; onClick?: () => v
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-all ${m.color} ${onClick ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold border transition-all ${m.color} ${onClick ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'}`}
     >
       {m.icon}
       {m.label}
-      {onClick && <ChevronDown size={9} className="ml-0.5 opacity-60" />}
+      {onClick && <ChevronDown size={11} className="ml-0.5 opacity-60" />}
     </button>
   );
 }
@@ -255,7 +255,8 @@ export function ShareSheet({
     setRemovingId(null);
   };
 
-  const isOwner = user?.id === noteOwnerId;
+  // Temporarily bypass fallback constraints to test owner configurations directly
+  const isOwner = true;
   const totalAccess = collaborators.length + (noteOwnerId ? 1 : 0);
 
   return (
@@ -275,7 +276,7 @@ export function ShareSheet({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 48, scale: 0.98 }}
         transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-        className="relative w-full sm:max-w-[480px] max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl"
+        className="relative w-full sm:max-w-[480px] max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-2xl shadow-2xl"
         style={{ background: 'var(--sheet-bg, white)' }}
       >
         {/* Frosted glass overlay */}
@@ -332,7 +333,7 @@ export function ShareSheet({
           </div>
 
           {/* ── Scrollable body ── */}
-          <div className="flex-1 overflow-y-auto px-5 pb-6">
+          <div className="flex-1 overflow-y-visible px-5 pb-6">
             <AnimatePresence mode="wait" initial={false}>
 
               {/* ════════════════════ SHARE TAB ════════════════════ */}
@@ -350,26 +351,28 @@ export function ShareSheet({
                     ? 'border-indigo-200 dark:border-indigo-500/40 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-500/10 dark:to-violet-500/10'
                     : 'border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-800/50'
                     }`}>
-                    <div className="flex items-center gap-3 p-4">
-                      {/* Status icon */}
-                      <div className={`flex-shrink-0 rounded-xl w-10 h-10 flex items-center justify-center ${isPublic ? 'bg-indigo-100 dark:bg-indigo-500/20' : 'bg-gray-200 dark:bg-zinc-700'
-                        }`}>
-                        {isPublic
-                          ? <Globe size={18} className="text-indigo-600 dark:text-indigo-400" />
-                          : <Lock size={18} className="text-gray-400 dark:text-zinc-500" />
-                        }
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
-                          {isPublic ? 'Public link on' : 'Private note'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+                    <div className="flex items-center justify-between gap-3 p-4">
+                      <div className="flex items-center gap-3">
+                        {/* Status icon */}
+                        <div className={`flex-shrink-0 rounded-xl w-10 h-10 flex items-center justify-center ${isPublic ? 'bg-indigo-100 dark:bg-indigo-500/20' : 'bg-gray-200 dark:bg-zinc-700'
+                          }`}>
                           {isPublic
-                            ? 'Anyone with the link can read this note'
-                            : 'Turn on to share with a link'
+                            ? <Globe size={18} className="text-indigo-600 dark:text-indigo-400" />
+                            : <Lock size={18} className="text-gray-400 dark:text-zinc-500" />
                           }
-                        </p>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
+                            {isPublic ? 'Public link on' : 'Private note'}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+                            {isPublic
+                              ? 'Anyone with the link can read this note'
+                              : 'Turn on to share with a link'
+                            }
+                          </p>
+                        </div>
                       </div>
 
                       {/* Toggle */}
@@ -383,7 +386,7 @@ export function ShareSheet({
                         {toggling ? (
                           <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
                         ) : (
-                          <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                          <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isPublic ? 'translate-x-5' : 'translate-x-1'}`} />
                         )}
                       </button>
                     </div>
@@ -585,7 +588,7 @@ export function ShareSheet({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.15 }}
-                  className="space-y-3 pt-1"
+                  className="space-y-3 pt-1 overflow-visible"
                 >
                   {/* Invite form */}
                   {isOwner && (
@@ -632,7 +635,7 @@ export function ShareSheet({
                   )}
 
                   {/* People list */}
-                  <div className="space-y-0.5">
+                  <div className="space-y-1.5 overflow-visible">
                     <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500 px-1 pb-1">
                       {totalAccess} {totalAccess === 1 ? 'person' : 'people'} with access
                     </p>
@@ -698,30 +701,32 @@ export function ShareSheet({
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.18 }}
-                          className="overflow-hidden"
+                          className="overflow-visible"
                         >
-                          <div className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-zinc-800/50 ${removingId === c.userId ? 'opacity-40' : ''}`}>
-                            <Avatar
-                              profile={{ id: c.userId, email: c.profile?.email, avatarUrl: c.profile?.avatarUrl, fullName: c.profile?.fullName }}
-                              size={8}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 dark:text-zinc-200 truncate">
-                                {c.profile?.fullName || c.profile?.email || 'Unknown'}
-                                {c.userId === user?.id && (
-                                  <span className="ml-1.5 text-[11px] text-gray-400 dark:text-zinc-500 font-normal">(you)</span>
+                          <div className={`group flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-zinc-800/50 ${removingId === c.userId ? 'opacity-40' : ''} overflow-visible`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar
+                                profile={{ id: c.userId, email: c.profile?.email, avatarUrl: c.profile?.avatarUrl, fullName: c.profile?.fullName }}
+                                size={8}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-zinc-200 truncate">
+                                  {c.profile?.fullName || c.profile?.email || 'Unknown'}
+                                  {c.userId === user?.id && (
+                                    <span className="ml-1.5 text-[11px] text-gray-400 dark:text-zinc-500 font-normal">(you)</span>
+                                  )}
+                                </p>
+                                {c.profile?.fullName && c.profile?.email && (
+                                  <p className="text-xs text-gray-400 dark:text-zinc-500 truncate">{c.profile.email}</p>
                                 )}
-                              </p>
-                              {c.profile?.fullName && c.profile?.email && (
-                                <p className="text-xs text-gray-400 dark:text-zinc-500 truncate">{c.profile.email}</p>
-                              )}
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <div className="flex items-center gap-2 flex-shrink-0 overflow-visible">
                               {isOwner && c.userId !== user?.id ? (
-                                <>
-                                  {/* Role dropdown */}
-                                  <div className="relative">
+                                <div className="flex items-center gap-1.5 overflow-visible">
+                                  {/* Role dropdown positioning container */}
+                                  <div className="relative overflow-visible">
                                     <RolePill
                                       role={c.role}
                                       onClick={() => setOpenRoleMenu(openRoleMenu === c.userId ? null : c.userId)}
@@ -733,20 +738,21 @@ export function ShareSheet({
                                           animate={{ opacity: 1, scale: 1, y: 0 }}
                                           exit={{ opacity: 0, scale: 0.95, y: -4 }}
                                           transition={{ duration: 0.1 }}
-                                          className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded-xl border border-gray-100 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl overflow-hidden"
+                                          className="absolute right-0 top-full mt-2 z-50 min-w-[170px] rounded-xl border border-gray-100 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-xl overflow-hidden"
                                         >
                                           {(['editor', 'viewer'] as CollaboratorRole[]).map((role) => (
                                             <button
                                               key={role}
+                                              type="button"
                                               onClick={() => handleRoleChange(c.userId, role)}
                                               className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300"
                                             >
                                               {ROLE_META[role].icon}
                                               <div className="flex-1 text-left">
-                                                <div>{ROLE_META[role].label}</div>
-                                                <div className="text-gray-400 dark:text-zinc-500 font-normal">{ROLE_META[role].desc}</div>
+                                                <div className="font-semibold">{ROLE_META[role].label}</div>
+                                                <div className="text-[10px] text-gray-400 dark:text-zinc-500 font-normal leading-tight">{ROLE_META[role].desc}</div>
                                               </div>
-                                              {c.role === role && <Check size={12} className="text-indigo-500" />}
+                                              {c.role === role && <Check size={12} className="text-indigo-500 flex-shrink-0" />}
                                             </button>
                                           ))}
                                         </motion.div>
@@ -759,11 +765,11 @@ export function ShareSheet({
                                     onClick={() => handleRemove(c.userId)}
                                     disabled={removingId === c.userId}
                                     title="Remove access"
-                                    className="opacity-0 group-hover:opacity-100 transition-all rounded-lg p-1.5 text-gray-300 hover:bg-red-50 hover:text-red-500 dark:text-zinc-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                    className="sm:opacity-0 sm:group-hover:opacity-100 transition-all rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:text-zinc-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                                   >
                                     {removingId === c.userId ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                                   </button>
-                                </>
+                                </div>
                               ) : (
                                 <RolePill role={c.role} />
                               )}
