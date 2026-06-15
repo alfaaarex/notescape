@@ -7,16 +7,29 @@
 ALTER TABLE notes
   ADD COLUMN IF NOT EXISTS share_slug TEXT UNIQUE;
 
--- Pre-populate slugs for existing public notes (optional back-fill)
--- Each slug is 7 chars from a safe alphabet (no ambiguous chars like 0/O, 1/l)
-UPDATE notes
-SET share_slug = (
-  SELECT string_agg(
-    substr('abcdefghijkmnpqrstuvwxyz23456789', (random()*31)::int + 1, 1), ''
-  )
-  FROM generate_series(1,7)
-)
-WHERE is_public = true AND share_slug IS NULL;
+-- Pre-populate slugs for existing public notes (collision-safe back-fill)
+-- Assigns a unique 7-char slug to each public note that doesn't have one yet.
+-- Uses a loop so any collision simply retries with a fresh random value.
+DO $$
+DECLARE
+  rec RECORD;
+  candidate TEXT;
+BEGIN
+  FOR rec IN SELECT id FROM notes WHERE is_public = true AND share_slug IS NULL LOOP
+    LOOP
+      SELECT string_agg(
+        substr('abcdefghijkmnpqrstuvwxyz23456789', (random()*31)::int + 1, 1), ''
+      )
+      INTO candidate
+      FROM generate_series(1, 7);
+
+      -- Only use this candidate if it isn't already taken
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM notes WHERE share_slug = candidate);
+    END LOOP;
+
+    UPDATE notes SET share_slug = candidate WHERE id = rec.id;
+  END LOOP;
+END $$;
 
 -- Index for fast slug lookups
 CREATE INDEX IF NOT EXISTS notes_share_slug_idx ON notes (share_slug)

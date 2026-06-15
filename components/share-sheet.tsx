@@ -353,7 +353,8 @@ export function ShareSheet({
                               <span className="ml-1.5 text-[10px] text-gray-400 dark:text-zinc-500">(you)</span>
                             )}
                           </p>
-                          {c.profile?.email && c.profile?.fullName && (
+                          {/* Only show email as subtitle when we also have a name to show above it */}
+                          {c.profile?.fullName && c.profile?.email && (
                             <p className="text-xs text-gray-400 dark:text-zinc-500 truncate">{c.profile.email}</p>
                           )}
                         </div>
