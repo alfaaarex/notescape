@@ -25,7 +25,9 @@ import {
   List,
   ListOrdered,
   Loader2,
+  Menu,
   Minus,
+  MoreHorizontal,
   Palette,
   Pencil,
   Pin,
@@ -303,6 +305,8 @@ export const Editor = ({
   const [slashIndex, setSlashIndex] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [showMobileToolbar, setShowMobileToolbar] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
   const [presentUsers, setPresentUsers] = useState<Record<string, any>>({});
   
   const { user } = useAuth();
@@ -335,6 +339,8 @@ export const Editor = ({
     }
     setSaveStatus('idle');
     setSlashOpen(false);
+    setShowMobileToolbar(false);
+    setShowMobileMore(false);
     setSummaryData(null);
     setSummaryError(null);
   }, [note]);
@@ -755,6 +761,7 @@ Rules:
             <ArrowLeft size={17} />
           </button>
 
+          {/* Desktop markdown toolbar */}
           <div className={`hidden items-center gap-1 rounded-lg bg-white/55 p-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 ${editorMode === 'preview' ? 'md:hidden' : 'md:flex'}`}>
             <ToolbarButton label="Heading" onClick={() => insertText('## ', '', 'Heading', true)} icon={<Heading2 size={15} />} />
             <ToolbarButton label="Bold" onClick={() => insertMarkdown('**')} icon={<Bold size={15} />} />
@@ -769,6 +776,18 @@ Rules:
 
           <div className="flex-1" />
 
+          {/* Mobile: formatting toggle */}
+          {editorMode !== 'preview' && (
+            <button
+              onClick={() => { setShowMobileToolbar(v => !v); setShowMobileMore(false); }}
+              className={`rounded-lg p-2 transition-colors md:hidden ${showMobileToolbar ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+              aria-label="Formatting"
+            >
+              <Menu size={16} />
+            </button>
+          )}
+
+          {/* Desktop mode switcher */}
           <div className="hidden items-center rounded-lg bg-white/55 p-0.5 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 sm:flex">
             <button
               onClick={() => setEditorMode('edit')}
@@ -836,6 +855,14 @@ Rules:
           <button onClick={handlePinToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${pinned ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={pinned ? 'Unpin' : 'Pin'}>
             {pinned ? <Pin size={15} /> : <PinOff size={15} />}
           </button>
+          {/* Mobile: more menu button */}
+          <button
+            onClick={() => { setShowMobileMore(v => !v); setShowMobileToolbar(false); }}
+            className={`rounded-lg p-2 transition-colors sm:hidden ${showMobileMore ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+            aria-label="More options"
+          >
+            <MoreHorizontal size={16} />
+          </button>
 
           <div className="flex items-center gap-1 mr-2">
             {Object.values(presentUsers).filter((u) => u.id !== user?.id).map((u) => {
@@ -870,7 +897,7 @@ Rules:
             })}
           </div>
 
-          <button onClick={handleShareToggle} className={`hidden rounded-lg p-2 transition-colors sm:block text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100`} aria-label="Share">
+          <button onClick={handleShareToggle} className="hidden rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100 sm:block" aria-label="Share">
             <Share size={15} />
           </button>
 
@@ -1068,6 +1095,131 @@ Rules:
             )}
           </AnimatePresence>
         </div>
+
+        {/* ══════════════════════════════════════════════
+            MOBILE FORMATTING TOOLBAR  (slide up from bottom of content)
+            Shown when the Menu button is tapped on mobile
+            ══════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {showMobileToolbar && (
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="absolute bottom-0 left-0 right-0 z-30 sm:hidden border-t border-black/5 bg-[color-mix(in_srgb,var(--note-bg)_95%,transparent)] backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/95"
+              style={{ '--note-bg': bgHex } as React.CSSProperties}
+            >
+              <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/10">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Formatting</span>
+                <button onClick={() => setShowMobileToolbar(false)} className="rounded-lg p-1 text-gray-400">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="grid grid-cols-5 gap-0 p-2">
+                {[
+                  { label: 'H2', icon: <Heading2 size={16} />, action: () => insertText('## ', '', 'Heading', true) },
+                  { label: 'Bold', icon: <Bold size={16} />, action: () => insertMarkdown('**') },
+                  { label: 'Italic', icon: <Italic size={16} />, action: () => insertMarkdown('*') },
+                  { label: 'Strike', icon: <Strikethrough size={16} />, action: () => insertMarkdown('~~') },
+                  { label: 'Code', icon: <Code size={16} />, action: () => insertText('`', '`', 'code') },
+                  { label: 'Quote', icon: <Quote size={16} />, action: () => insertText('> ', '', 'Quote', true) },
+                  { label: 'List', icon: <List size={16} />, action: () => insertText('- ', '', 'List item', true) },
+                  { label: 'Task', icon: <CheckSquare size={16} />, action: () => insertText('- [ ] ', '', 'Todo', true) },
+                  { label: 'Link', icon: <Link size={16} />, action: () => insertText('[', '](https://)', 'link') },
+                  { label: 'H3', icon: <Heading3 size={16} />, action: () => insertText('### ', '', 'Heading', true) },
+                ].map(({ label, icon, action }) => (
+                  <button
+                    key={label}
+                    onClick={() => { action(); setShowMobileToolbar(false); }}
+                    className="flex flex-col items-center gap-1 rounded-xl p-3 text-gray-600 transition-colors active:bg-black/5 dark:text-zinc-400 dark:active:bg-white/10"
+                  >
+                    {icon}
+                    <span className="text-[9px] font-semibold">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ══════════════════════════════════════════════
+            MOBILE MORE MENU (slide up)
+            Pin, Share, Mode switch, Insight, Focus, Delete
+            ══════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {showMobileMore && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 sm:hidden"
+                onClick={() => setShowMobileMore(false)}
+              />
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="absolute bottom-0 left-0 right-0 z-40 sm:hidden rounded-t-2xl border-t border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950"
+              >
+                {/* Drag handle */}
+                <div className="flex justify-center pt-3 pb-1">
+                  <div className="h-1 w-10 rounded-full bg-gray-200 dark:bg-zinc-700" />
+                </div>
+
+                {/* Mode switcher */}
+                <div className="px-4 pb-2 pt-1">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">View Mode</p>
+                  <div className="flex gap-2">
+                    {([
+                      { mode: 'edit' as const, icon: <Pencil size={14} />, label: 'Edit' },
+                      { mode: 'preview' as const, icon: <Eye size={14} />, label: 'Preview' },
+                    ] as const).map(({ mode, icon, label }) => (
+                      <button
+                        key={mode}
+                        onClick={() => { setEditorMode(mode); setShowMobileMore(false); }}
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${editorMode === mode ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-300'}`}
+                      >
+                        {icon}{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions grid */}
+                <div className="grid grid-cols-4 gap-1 px-3 py-2">
+                  {[
+                    { label: pinned ? 'Unpin' : 'Pin', icon: pinned ? <Pin size={18} /> : <PinOff size={18} />, action: handlePinToggle, active: pinned },
+                    { label: 'Share', icon: <Share size={18} />, action: () => { setShowMobileMore(false); handleShareToggle(); }, active: false },
+                    { label: 'Insight', icon: <Sparkles size={18} />, action: () => { setShowMobileMore(false); handleGenerateSummary(); }, active: showSummary },
+                    { label: 'Focus', icon: <Focus size={18} />, action: () => { setFocusMode(v => !v); setShowMobileMore(false); }, active: focusMode },
+                    { label: 'Color', icon: <Palette size={18} />, action: () => { setShowColorPicker(v => !v); setShowMobileMore(false); }, active: false },
+                  ].map(({ label, icon, action, active }) => (
+                    <button
+                      key={label}
+                      onClick={action}
+                      className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'bg-gray-50 text-gray-700 dark:bg-zinc-900 dark:text-zinc-300'}`}
+                    >
+                      {icon}
+                      {label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setShowMobileMore(false); handleDelete(); }}
+                    className="flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                    Delete
+                  </button>
+                </div>
+                <div className="h-safe-area-inset-bottom pb-4" />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
       </motion.div>
 
       <AnimatePresence>
@@ -1093,14 +1245,14 @@ Rules:
       <AnimatePresence>
         {showSummary && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 320, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="hidden h-full flex-shrink-0 flex-col overflow-hidden border-l border-gray-100 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:flex"
+            className="flex h-full w-full flex-shrink-0 flex-col overflow-hidden border-l border-gray-100 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:w-80"
           >
             {/* Panel header */}
-            <div className="flex h-14 min-w-[320px] items-center justify-between border-b border-gray-100 px-4 dark:border-zinc-800">
+            <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4 dark:border-zinc-800">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-200">
                 <Sparkles size={15} className="text-indigo-400" /> Note Insight
               </div>
@@ -1121,7 +1273,7 @@ Rules:
             </div>
 
             {/* Panel body */}
-            <div className="min-w-[320px] flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-5">
 
               {/* Stats row — always shown */}
               <div className="mb-5 grid grid-cols-3 gap-2">
