@@ -47,6 +47,7 @@ import type { Collaborator, CollaboratorRole, Profile } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
 import { ShareSheet } from '@/components/share-sheet';
 import { useAuth } from '@/components/auth-provider';
+import { useYjsNote } from '@/lib/useYjsNote';
 
 interface EditorProps {
   note: Note | null;
@@ -254,7 +255,7 @@ const renderPreview = (text: string) => {
     else if (line.startsWith('## ')) { elements.push(<h2 key={key} className="mt-6 text-2xl font-bold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(3))}</h2>); }
     else if (line.startsWith('### ')) { elements.push(<h3 key={key} className="mt-5 text-xl font-semibold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(4))}</h3>); }
     else if (line.startsWith('- [ ] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-1 inline-block h-4 w-4 flex-shrink-0 rounded border border-gray-300 dark:border-zinc-600" /><span>{renderInline(line.slice(6))}</span></p>); }
-    else if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-500 dark:text-zinc-500"><span className="mt-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-gray-800 dark:bg-zinc-200"><svg viewBox="0 0 10 10" className="h-2.5 w-2.5 text-white dark:text-zinc-900" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span><span className="line-through">{renderInline(line.slice(6))}</span></p>); }
+    else if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-500 dark:text-zinc-500"><span className="mt-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-gray-800 dark:bg-zinc-200"><svg viewBox="0 0 10 10" className="h-2.5 w-2.5 text-white dark:text-zinc-900" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span><span className="line-through">{renderInline(line.slice(6))}</span></p>); }
     else if (line.startsWith('- ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-zinc-500" /><span>{renderInline(line.slice(2))}</span></p>); }
     else if (/^\d+\.\s/.test(line)) { elements.push(<p key={key} className="my-1.5 text-gray-700 dark:text-zinc-300">{renderInline(line)}</p>); }
     else if (line.startsWith('> ')) { elements.push(<blockquote key={key} className="my-3 border-l-2 border-indigo-300 pl-4 text-gray-600 italic dark:border-indigo-700 dark:text-zinc-400">{renderInline(line.slice(2))}</blockquote>); }
@@ -268,20 +269,24 @@ const renderPreview = (text: string) => {
   return elements;
 };
 
-export const Editor = ({ 
-  note, 
-  onSave, 
-  onDelete, 
-  onClose, 
-  onTogglePin, 
+export const Editor = ({
+  note,
+  onSave,
+  onDelete,
+  onClose,
+  onTogglePin,
   onTogglePublicShare,
   getCollaborators,
   addCollaborator,
   removeCollaborator,
   updateCollaborator
 }: EditorProps) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  // ── Yjs collaborative title + content ──────────────────────────
+  const { title, content, setTitle, setContent, isSyncing } = useYjsNote(
+    note?.id,
+    note?.title ?? '',
+    note?.content ?? '',
+  );
   const [color, setColor] = useState('alabaster');
   const [tags, setTags] = useState<string[]>([]);
   const [pinned, setPinned] = useState(false);
@@ -308,7 +313,7 @@ export const Editor = ({
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [presentUsers, setPresentUsers] = useState<Record<string, any>>({});
-  
+
   const { user } = useAuth();
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -319,8 +324,7 @@ export const Editor = ({
 
   useEffect(() => {
     if (note) {
-      setTitle(note.title);
-      setContent(note.content);
+      // title + content are managed by useYjsNote; skip them here
       setColor(colorMap[note.color] ? note.color : 'alabaster');
       setTags(note.tags ?? []);
       setPinned(note.pinned ?? false);
@@ -330,8 +334,6 @@ export const Editor = ({
       // Generate a fresh ID immediately so a new note never inherits
       // the previous note's ID (which would cause content to be copied).
       noteIdRef.current = crypto.randomUUID();
-      setTitle('');
-      setContent('');
       setColor('alabaster');
       setTags([]);
       setPinned(false);
@@ -345,17 +347,15 @@ export const Editor = ({
     setSummaryError(null);
   }, [note?.id]);
 
-  // Realtime subscription for the current note
+  // Realtime subscription for the current note (non-Yjs fields only: color, pinned, isPublic)
   // Dependency array is ONLY note?.id — we don't want to re-subscribe on every keystroke.
-  // We use refs to read the latest state values inside the callback without re-subscribing.
-  const contentRef = useRef(content);
-  const titleRef = useRef(title);
   const colorRef = useRef(color);
   const isPublicRef = useRef(isPublic);
   const pinnedRef = useRef(pinned);
 
-  useEffect(() => { contentRef.current = content; }, [content]);
-  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { colorRef.current = color; }, [color]);
+  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
+  useEffect(() => { pinnedRef.current = pinned; }, [pinned]);
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
   useEffect(() => { pinnedRef.current = pinned; }, [pinned]);
@@ -376,9 +376,7 @@ export const Editor = ({
           const remoteTs = newData.updated_at;
           if (remoteTs && Math.abs(remoteTs - lastSavedAtRef.current) < 3000) return;
 
-          // Only update fields that actually changed vs current local state
-          if (newData.content !== contentRef.current) setContent(newData.content ?? '');
-          if (newData.title !== titleRef.current) setTitle(newData.title ?? '');
+          // title + content are synced via Yjs; only update non-collaborative fields here
           if (colorMap[newData.color] && newData.color !== colorRef.current) setColor(newData.color);
           if (newData.is_public !== isPublicRef.current) setIsPublic(newData.is_public);
           if (newData.pinned !== pinnedRef.current) setPinned(newData.pinned);
@@ -868,8 +866,8 @@ Rules:
             {Object.values(presentUsers).filter((u) => u.id !== user?.id).map((u) => {
               const isTyping = !!typingUsers[u.id];
               // Deterministic avatar color
-              const palette = ['bg-rose-400','bg-orange-400','bg-amber-400','bg-emerald-500','bg-teal-500','bg-sky-500','bg-indigo-500','bg-violet-500','bg-pink-500'];
-              let h = 0; for (let i = 0; i < (u.id||'').length; i++) h = (h * 31 + (u.id||'').charCodeAt(i)) >>> 0;
+              const palette = ['bg-rose-400', 'bg-orange-400', 'bg-amber-400', 'bg-emerald-500', 'bg-teal-500', 'bg-sky-500', 'bg-indigo-500', 'bg-violet-500', 'bg-pink-500'];
+              let h = 0; for (let i = 0; i < (u.id || '').length; i++) h = (h * 31 + (u.id || '').charCodeAt(i)) >>> 0;
               const avatarBg = palette[h % palette.length];
               return (
                 <div
@@ -880,7 +878,7 @@ Rules:
                     <img src={u.avatarUrl} alt={u.fullName || u.email} className="h-full w-full rounded-full object-cover" />
                   ) : (
                     <div className={`h-full w-full rounded-full ${avatarBg} flex items-center justify-center`}>
-                      <span className="text-[10px] font-bold text-white">{(u.email||'?').charAt(0).toUpperCase()}</span>
+                      <span className="text-[10px] font-bold text-white">{(u.email || '?').charAt(0).toUpperCase()}</span>
                     </div>
                   )}
                   {isTyping && (
@@ -1079,7 +1077,13 @@ Rules:
             <span>{content.split('\n').length} lines</span>
           </div>
           <AnimatePresence mode="wait">
-            {saveStatus === 'saving' && (
+            {isSyncing && (
+              <motion.span key="syncing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-sky-500 dark:text-sky-400">
+                <Loader2 size={11} className="animate-spin" />
+                Syncing peers...
+              </motion.span>
+            )}
+            {!isSyncing && saveStatus === 'saving' && (
               <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gray-400 opacity-75 dark:bg-zinc-500" />
@@ -1088,7 +1092,7 @@ Rules:
                 Saving...
               </motion.span>
             )}
-            {saveStatus === 'saved' && (
+            {!isSyncing && saveStatus === 'saved' && (
               <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-gray-400 dark:text-zinc-500">
                 Saved
               </motion.span>
@@ -1410,11 +1414,10 @@ Rules:
                               key={tag}
                               onClick={() => !already && handleAddSuggestedTag(tag)}
                               disabled={already}
-                              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${
-                                already
+                              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${already
                                   ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 cursor-default'
                                   : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400'
-                              }`}
+                                }`}
                             >
                               {already ? <Check size={10} /> : <Tag size={10} />}
                               #{tag}
