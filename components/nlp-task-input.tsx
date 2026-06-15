@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Loader2, ArrowRight, X } from 'lucide-react';
+import { Zap, ArrowRight, X, RotateCw, Clock, Flag, Palette } from 'lucide-react';
 import type { TaskPriority, TaskStatus } from '@/lib/types';
-import { TASK_COLOR_OPTIONS } from '@/lib/types';
+import { TASK_COLOR_OPTIONS, PRIORITY_COLORS } from '@/lib/types';
+import { parseTaskInput, recurrenceLabel } from '@/lib/regex-parser';
 
+// Re-export so task-board / other consumers don't break
 export interface NlpParsedTask {
   title: string;
   description: string;
@@ -17,6 +19,7 @@ export interface NlpParsedTask {
   mode: 'deadline' | 'timeBox' | 'floating';
   start?: string | null;
   duration?: number;
+  recurrence?: import('@/lib/types').RecurrenceRule | null;
 }
 
 interface NlpTaskInputProps {
@@ -24,209 +27,91 @@ interface NlpTaskInputProps {
 }
 
 const EXAMPLES = [
-  'Study physics for 45 mins at 4 PM tomorrow',
-  'Fix login bug high priority due by 3 PM Friday',
-  'Review PR medium priority next Friday',
-  'Read calculus module when I have time',
-  'Deploy to staging today urgent',
+  'Gym every Mon, Wed, Fri at 6am for 1h priority:high',
+  'Fix login bug urgent at 2pm for 30min',
+  'Review PR every weekday at 9am for 45min',
+  'Study calculus every day at 8pm for 1.5h #medium',
+  'Deploy to staging tomorrow at 3pm priority:high',
+  'Design sprint every Mon at 10am for 2h',
 ];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+// Priority badge colour helper
+function priorityStyle(p: TaskPriority) {
+  return { backgroundColor: PRIORITY_COLORS[p] };
 }
 
-function offsetISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+// Format duration in minutes → "1h", "45 min", "1h 30 min"
+function formatDuration(mins: number): string {
+  if (mins <= 0) return '';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
 }
 
-function nextWeekdayISO(weekday: number) {
-  const d = new Date();
-  const diff = (weekday - d.getDay() + 7) % 7 || 7;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+// Format HH:mm → "6:00 AM"
+function format24to12(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const period = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-function resolveDate(raw: string | null): string | null {
-  if (!raw) return null;
-  const s = raw.toLowerCase().trim();
-  if (s === 'today') return todayISO();
-  if (s === 'tomorrow') return offsetISO(1);
-  if (s === 'yesterday') return offsetISO(-1);
-  if (s === 'next week' || s === 'in a week') return offsetISO(7);
-  if (s === 'in two weeks' || s === 'in 2 weeks') return offsetISO(14);
-  const days: Record<string, number> = {
-    sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-    thursday: 4, friday: 5, saturday: 6,
-  };
-  const nextDayMatch = s.match(/^(?:next\s+)?(\w+)$/);
-  if (nextDayMatch && days[nextDayMatch[1]] !== undefined) {
-    return nextWeekdayISO(days[nextDayMatch[1]]);
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  return null;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function NlpTaskInput({ onParsed }: NlpTaskInputProps) {
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [exampleIdx, setExampleIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Live preview — parse as user types (debounced 120ms)
+  const [preview, setPreview] = useState<NlpParsedTask | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!input.trim()) { setPreview(null); return; }
+    debounceRef.current = setTimeout(() => {
+      try {
+        const parsed = parseTaskInput(input);
+        setPreview(parsed as NlpParsedTask);
+      } catch {
+        setPreview(null);
+      }
+    }, 120);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [input]);
 
   const cycleExample = useCallback(() => {
     setExampleIdx((i) => (i + 1) % EXAMPLES.length);
   }, []);
 
-  const parse = useCallback(async () => {
+  const submit = useCallback(() => {
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
-
-    setLoading(true);
-    setError(null);
-
-    const today = new Date().toLocaleDateString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-
-    const systemPrompt = `You are an expert task extraction assistant. Today is ${today}.
-Parse the user's input sentence and match it perfectly to one of these three task modes:
-
-1. "timeBox": When a specific length/duration or an exact starting timeline block is explicitly stated (e.g., "for 45 minutes", "1 hour session at 4pm").
-2. "floating": When the task is open-ended without any date constraints or expressions indicating casual pacing (e.g., "when I get around to it", "someday").
-3. "deadline": Default choice for classic tasks that need completion by a specific date/time without defining a duration block.
-
-Extraction rules:
-- title: clear task action, excluding metadata phrasing like "urgent", "due tomorrow", or "for 30 mins".
-- description: secondary contextual details if any, otherwise an empty string.
-- status: always infer "todo" as the default base status.
-- priority: "urgent"/"critical"/"asap" -> high; "soon" -> medium; "whenever" -> low; else -> none.
-- colorTag: infer from task domain (coding/bugs -> rose; reviews/deadlines -> amber; features -> emerald; docs/admin -> sky; design -> violet; else -> slate).
-- dueDate: parse into tokens like "today", "tomorrow", day names like "monday", or null.
-- dueTime: extract concrete times into HH:mm format (24hr clock).
-- start: For "timeBox" mode only. Construct a partial target timestamp format relative to the intent (e.g., "YYYY-MM-DDTHH:mm:00"). If date is missing, infer the target date based on context.
-- duration: For "timeBox" mode only. Extract the time length block strictly in total minutes as an integer.`;
-
-    // Structured JSON schema matching the xAI strict object specs
-    const jsonSchema = {
-      name: "task_extraction",
-      strict: true,
-      schema: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          description: { type: "string" },
-          priority: { type: "string", enum: ["high", "medium", "low", "none"] },
-          status: { type: "string", enum: ["todo", "in_progress", "done", "cancelled"] },
-          mode: { type: "string", enum: ["deadline", "timeBox", "floating"] },
-          dueDate: { type: "string", nullable: true },
-          dueTime: { type: "string", nullable: true, description: "Format as HH:mm or null" },
-          start: { type: "string", nullable: true, description: "For timebox mode: YYYY-MM-DDTHH:mm:00 structure or null" },
-          duration: { type: "number", description: "Duration block in total minutes, default 0" },
-          colorTag: { type: "string", enum: ["rose", "amber", "emerald", "sky", "violet", "slate"] }
-        },
-        required: ["title", "description", "priority", "status", "mode", "dueDate", "dueTime", "start", "duration", "colorTag"],
-        additionalProperties: false
-      }
-    };
-
-    try {
-      // Routed through your local Next.js secure endpoint to avoid CORS blocks and secure the secret key
-      const response = await fetch('/api/parse-task', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userInput: trimmed,
-          systemPrompt,
-          jsonSchema,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server proxy error: ${errorText}`);
-      }
-
-      const data = await response.json();
-      const textOutput = data.choices?.[0]?.message?.content;
-      if (!textOutput) throw new Error("Received an empty response text payload from xAI endpoint.");
-
-      const parsed = JSON.parse(textOutput);
-
-      // Validate sets
-      const validPriorities: TaskPriority[] = ['high', 'medium', 'low', 'none'];
-      const validStatuses: TaskStatus[] = ['todo', 'in_progress', 'done', 'cancelled'];
-      const validModes = ['deadline', 'timeBox', 'floating'];
-      const validColors = TASK_COLOR_OPTIONS.map((c) => c.value);
-
-      let resolvedDueDate = resolveDate(parsed.dueDate);
-      let calculatedStart = parsed.start;
-
-      if (parsed.mode === 'timeBox' && parsed.start) {
-        if (parsed.start.includes('tomorrow')) {
-          calculatedStart = parsed.start.replace('tomorrow', offsetISO(1));
-        } else if (parsed.start.includes('today')) {
-          calculatedStart = parsed.start.replace('today', todayISO());
-        }
-        if (calculatedStart && calculatedStart.length >= 10) {
-          resolvedDueDate = calculatedStart.slice(0, 10);
-        }
-      }
-
-      const result: NlpParsedTask = {
-        title: typeof parsed.title === 'string' ? parsed.title.trim() : trimmed,
-        description: typeof parsed.description === 'string' ? parsed.description.trim() : '',
-        priority: validPriorities.includes(parsed.priority) ? parsed.priority : 'none',
-        status: validStatuses.includes(parsed.status) ? parsed.status : 'todo',
-        mode: validModes.includes(parsed.mode) ? parsed.mode : 'deadline',
-        dueDate: resolvedDueDate,
-        dueTime: parsed.dueTime || (parsed.mode === 'timeBox' && calculatedStart ? calculatedStart.slice(11, 16) : null),
-        colorTag: validColors.includes(parsed.colorTag) ? parsed.colorTag : 'slate',
-        start: calculatedStart,
-        duration: Number(parsed.duration) || 0,
-      };
-
-      setInput('');
-      onParsed(result, trimmed);
-    } catch (err) {
-      console.error('xAI NLP parse failed:', err);
-      setError("Couldn't parse that — opening blank task instead.");
-
-      setTimeout(() => {
-        setError(null);
-        onParsed({
-          title: trimmed,
-          description: '',
-          priority: 'none',
-          status: 'todo',
-          mode: 'deadline',
-          dueDate: null,
-          colorTag: 'slate',
-        }, trimmed);
-        setInput('');
-      }, 1800);
-    } finally {
-      setLoading(false);
-    }
-  }, [input, loading, onParsed]);
+    if (!trimmed) return;
+    const parsed = parseTaskInput(trimmed);
+    setInput('');
+    setPreview(null);
+    onParsed(parsed as NlpParsedTask, trimmed);
+  }, [input, onParsed]);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') parse();
-    if (e.key === 'Escape') setInput('');
+    if (e.key === 'Enter') submit();
+    if (e.key === 'Escape') { setInput(''); setPreview(null); }
   };
 
+  const colorHex = preview
+    ? TASK_COLOR_OPTIONS.find((c) => c.value === preview.colorTag)?.hex ?? '#94a3b8'
+    : '#94a3b8';
+
   return (
-    <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-r from-indigo-50/60 via-white to-purple-50/40 dark:from-indigo-950/20 dark:via-zinc-900 dark:to-purple-950/20">
+    <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-r from-violet-50/60 via-white to-indigo-50/40 dark:from-violet-950/20 dark:via-zinc-900 dark:to-indigo-950/20">
+      {/* Input row */}
       <div className="flex items-center gap-2">
-        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-500 dark:bg-indigo-500/15 dark:text-indigo-400">
-          <Sparkles size={15} />
+        {/* Icon — bolt for instant parsing */}
+        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-500 dark:bg-violet-500/15 dark:text-violet-400">
+          <Zap size={15} />
         </div>
 
         <div className="relative flex-1">
@@ -236,13 +121,12 @@ Extraction rules:
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
             placeholder={`Try: "${EXAMPLES[exampleIdx]}"`}
-            disabled={loading}
             onClick={cycleExample}
-            className="w-full bg-transparent text-sm text-gray-700 dark:text-zinc-200 placeholder:text-gray-400 dark:placeholder:text-zinc-500 outline-none pr-8 disabled:opacity-60"
+            className="w-full bg-transparent text-sm text-gray-700 dark:text-zinc-200 placeholder:text-gray-400 dark:placeholder:text-zinc-500 outline-none pr-8"
           />
-          {input && !loading && (
+          {input && (
             <button
-              onClick={() => setInput('')}
+              onClick={() => { setInput(''); setPreview(null); }}
               className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-500 dark:hover:text-zinc-400"
             >
               <X size={13} />
@@ -251,26 +135,89 @@ Extraction rules:
         </div>
 
         <button
-          onClick={parse}
-          disabled={!input.trim() || loading}
-          className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          aria-label="Parse task"
+          onClick={submit}
+          disabled={!input.trim()}
+          className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          aria-label="Create task"
         >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+          <ArrowRight size={14} />
         </button>
       </div>
 
-      <AnimatePresence>
-        {error ? (
-          <motion.p
-            key="error"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mt-1.5 text-[11px] text-amber-500 dark:text-amber-400"
+      {/* Live parse preview */}
+      <AnimatePresence mode="wait">
+        {preview && input.trim() ? (
+          <motion.div
+            key="preview"
+            initial={{ opacity: 0, y: -6, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -4, height: 0 }}
+            transition={{ duration: 0.15 }}
+            className="mt-2 overflow-hidden"
           >
-            {error}
-          </motion.p>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              {/* Color dot + title */}
+              <span
+                className="flex items-center gap-1 font-medium text-gray-700 dark:text-zinc-200 truncate max-w-[160px]"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: colorHex }}
+                />
+                {preview.title || '…'}
+              </span>
+
+              {/* Priority badge */}
+              {preview.priority !== 'none' && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-white font-semibold uppercase tracking-wider"
+                  style={priorityStyle(preview.priority)}
+                >
+                  <Flag size={9} className="inline mr-0.5 -mt-px" />
+                  {preview.priority}
+                </span>
+              )}
+
+              {/* Recurrence badge */}
+              {preview.recurrence && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 font-medium">
+                  <RotateCw size={9} />
+                  {recurrenceLabel(preview.recurrence)}
+                </span>
+              )}
+
+              {/* Time */}
+              {preview.dueTime && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 font-medium">
+                  <Clock size={9} />
+                  {format24to12(preview.dueTime)}
+                </span>
+              )}
+
+              {/* Duration */}
+              {!!preview.duration && preview.duration > 0 && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium">
+                  {formatDuration(preview.duration)}
+                </span>
+              )}
+
+              {/* Mode chip */}
+              <span className="px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-medium capitalize">
+                {preview.mode}
+              </span>
+
+              {/* Color label */}
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-medium">
+                <Palette size={9} />
+                {preview.colorTag}
+              </span>
+
+              {/* Enter hint */}
+              <span className="ml-auto text-gray-300 dark:text-zinc-600 hidden sm:inline">
+                ↵ to create
+              </span>
+            </div>
+          </motion.div>
         ) : (
           <motion.p
             key="hint"
@@ -278,7 +225,7 @@ Extraction rules:
             animate={{ opacity: 1 }}
             className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500"
           >
-            Describe a task in plain English — AI automatically switches modes, extracts time blocks, and sets priorities.
+            Instant parsing — type a task with time, recurrence, and priority. No AI needed.
           </motion.p>
         )}
       </AnimatePresence>

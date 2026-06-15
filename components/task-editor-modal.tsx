@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Flag, Tag, FileText, Loader2, Clock, RotateCw } from 'lucide-react';
-import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
+import type { Task, TaskPriority, TaskStatus, RecurrenceRule } from '@/lib/types';
 import {
   PRIORITY_LABELS,
   PRIORITY_COLORS,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/types';
 import type { Note } from '@/lib/storage';
 import type { NlpParsedTask } from '@/components/nlp-task-input';
+import { recurrenceLabel } from '@/lib/regex-parser';
 
 interface TaskEditorModalProps {
   open: boolean;
@@ -49,6 +50,7 @@ export function TaskEditorModal({
   const [startTime, setStartTime] = useState(''); // HH:mm
   const [duration, setDuration] = useState(0); // in minutes
   const [linkedNoteId, setLinkedNoteId] = useState<string | null>(null);
+  const [recurrence, setRecurrence] = useState<RecurrenceRule | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -80,6 +82,7 @@ export function TaskEditorModal({
         setDueTime(task.dueTime ?? '');
       }
       setLinkedNoteId(task.linkedNoteId);
+      setRecurrence((task as any).recurrence ?? null);
     } else if (nlpPrefill) {
       setTitle(nlpPrefill.title);
       setDescription(nlpPrefill.description);
@@ -108,6 +111,7 @@ export function TaskEditorModal({
         setDueTime(nlpPrefill.dueTime ?? '');
       }
       setLinkedNoteId(null);
+      setRecurrence((nlpPrefill as any).recurrence ?? null);
     } else {
       setTitle('');
       setDescription('');

@@ -37,6 +37,14 @@ export interface Collaborator {
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled';
 
+export type RecurrenceDayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface RecurrenceRule {
+  type: 'daily' | 'weekly' | 'weekdays' | 'weekends' | 'custom';
+  days: RecurrenceDayKey[];
+  interval: number;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -48,8 +56,11 @@ export interface Task {
   linkedNoteId: string | null;
   createdAt: number;
   updatedAt: number;
-  dueTime?: string;      // <-- Ensure this is present
-  mode?: 'deadline' | 'timeBox' | 'floating'; // <-- Ensure this is present
+  dueTime?: string;
+  mode?: 'deadline' | 'timeBox' | 'floating';
+  start?: string | null;        // ISO datetime for timeBox
+  duration?: number;            // minutes for timeBox
+  recurrence?: RecurrenceRule | null;
 }
 
 export const PRIORITY_LABELS: Record<TaskPriority, string> = {
