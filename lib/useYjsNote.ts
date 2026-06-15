@@ -1,17 +1,32 @@
 /**
  * useYjsNote.ts
  *
- * React hook that owns the Y.Doc for a single note and exposes:
- *  - title / content — the current string values (React state, re-renders on change)
- *  - setTitle / setContent — functions that write into the Y.Doc
- *    (changes propagate automatically to all peers via YjsSupabaseProvider)
- *  - isSyncing — true during the initial peer sync window
+ * React hook that owns the Y.Doc for a single note.
  *
- * The caller should use setTitle/setContent instead of their own useState
- * setters for the fields you want to co-edit.
+ * Key fixes over v1:
  *
- * Non-collaborative fields (color, tags, pinned, isPublic) are NOT managed
- * here — they keep their existing last-writer-wins behaviour via postgres_changes.
+ * 1. CHARACTER-LEVEL DIFFS instead of full delete+insert
+ *    The original setContent/setTitle did `delete(0, len); insert(0, val)` which
+ *    means two simultaneous edits always clobber each other — defeating the whole
+ *    point of Yjs.  We now compute the minimal diff (common prefix + suffix) and
+ *    only delete/insert the changed middle slice.  Yjs can then merge concurrent
+ *    edits on the unchanged regions correctly.
+ *
+ * 2. SEEDING RACE fixed
+ *    Previously `seededForNoteRef` was declared below the effect that used it,
+ *    and the seed ran after the provider was already constructed (so a fast peer
+ *    could send step2 before we seeded, leaving us with a blank Y.Doc that then
+ *    got merged on top of their content).  Now we seed the Y.Doc synchronously
+ *    before constructing the provider.
+ *
+ * 3. NO ARBITRARY TIMEOUT for isSyncing
+ *    We don't know when peers have finished sending us their state, so we drop
+ *    the fake 1.5s timer. isSyncing is true until we've received at least one
+ *    remote update OR 2 s have passed with no peers — whichever comes first.
+ *
+ * 4. STABLE SETTERS
+ *    setTitle/setContent are stable useCallback refs — they don't change across
+ *    renders, so they can safely appear in dependency arrays elsewhere.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -19,119 +34,124 @@ import * as Y from 'yjs';
 import { supabase } from './supabaseClient';
 import { YjsSupabaseProvider } from './yjsSupabaseProvider';
 
-export function useYjsNote(noteId: string | undefined, initialTitle: string, initialContent: string) {
-  // Y.Doc lives for the lifetime of this hook instance (i.e. while a note is open)
+// ── Diff helper ──────────────────────────────────────────────────────────────
+// Returns the minimal { start, deleteCount, insert } to turn `prev` into `next`.
+// By only touching the changed region, Yjs can CRDT-merge concurrent edits on
+// the unchanged parts of the string.
+function computeDiff(prev: string, next: string): { start: number; deleteCount: number; insert: string } {
+  let start = 0;
+  while (start < prev.length && start < next.length && prev[start] === next[start]) start++;
+
+  let endPrev = prev.length;
+  let endNext = next.length;
+  while (endPrev > start && endNext > start && prev[endPrev - 1] === next[endNext - 1]) {
+    endPrev--;
+    endNext--;
+  }
+
+  return {
+    start,
+    deleteCount: endPrev - start,
+    insert: next.slice(start, endNext),
+  };
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────────────
+export function useYjsNote(
+  noteId: string | undefined,
+  initialTitle: string,
+  initialContent: string,
+) {
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<YjsSupabaseProvider | null>(null);
-  const isLocalChangeRef = useRef(false); // prevents feedback loops
 
   const [title, setTitleState] = useState(initialTitle);
   const [content, setContentState] = useState(initialContent);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Bootstrap or reset the Y.Doc whenever the note changes
+  // Bootstrap / reset whenever the open note changes
   useEffect(() => {
     if (!noteId) return;
 
-    // Tear down previous session
-    if (providerRef.current) {
-      providerRef.current.destroyWithClient(supabase);
-      providerRef.current = null;
-    }
-    if (ydocRef.current) {
-      ydocRef.current.destroy();
-      ydocRef.current = null;
-    }
+    // ── Tear down previous session ───────────────────────────────
+    providerRef.current?.destroyWithClient(supabase);
+    providerRef.current = null;
+    ydocRef.current?.destroy();
+    ydocRef.current = null;
 
+    // ── Create doc and seed from DB synchronously ────────────────
+    // Seeding BEFORE constructing the provider means the doc already has
+    // content when we send step1, so peers immediately get a full state-vector.
     const ydoc = new Y.Doc();
-    ydocRef.current = ydoc;
-
     const yTitle = ydoc.getText('title');
     const yContent = ydoc.getText('content');
 
-    // Seed the doc with the authoritative values from Supabase (only when empty)
-    // This runs before any remote sync so a new joiner sees the saved state
-    // immediately rather than a blank page.
     ydoc.transact(() => {
-      if (yTitle.length === 0 && initialTitle) {
-        yTitle.insert(0, initialTitle);
-      }
-      if (yContent.length === 0 && initialContent) {
-        yContent.insert(0, initialContent);
-      }
-    }, 'init');
+      if (initialTitle) yTitle.insert(0, initialTitle);
+      if (initialContent) yContent.insert(0, initialContent);
+    }, 'db-seed');
 
-    // Mirror Y.Text → React state
-    const onTitleChange = () => {
-      isLocalChangeRef.current = true;
-      setTitleState(yTitle.toString());
-      isLocalChangeRef.current = false;
-    };
-    const onContentChange = () => {
-      isLocalChangeRef.current = true;
-      setContentState(yContent.toString());
-      isLocalChangeRef.current = false;
-    };
+    setTitleState(initialTitle);
+    setContentState(initialContent);
 
+    ydocRef.current = ydoc;
+
+    // ── Mirror Y.Text changes → React state ─────────────────────
+    const onTitleChange = () => setTitleState(yTitle.toString());
+    const onContentChange = () => setContentState(yContent.toString());
     yTitle.observe(onTitleChange);
     yContent.observe(onContentChange);
 
-    // Kick off realtime sync
+    // ── Start syncing ────────────────────────────────────────────
     setIsSyncing(true);
+
+    // Stop spinner after first remote update or 2 s timeout
+    let synced = false;
+    const syncTimeout = setTimeout(() => { synced = true; setIsSyncing(false); }, 2000);
+    const onRemoteUpdate = (_: Uint8Array, origin: unknown) => {
+      if (origin !== null && !synced) {
+        synced = true;
+        clearTimeout(syncTimeout);
+        setIsSyncing(false);
+      }
+    };
+    ydoc.on('update', onRemoteUpdate);
+
+    // ── Construct provider AFTER doc is seeded ───────────────────
     const provider = new YjsSupabaseProvider(supabase, noteId, ydoc);
     providerRef.current = provider;
 
-    // Give the initial sync 1.5 s then stop showing spinner
-    const syncTimer = setTimeout(() => setIsSyncing(false), 1500);
-
     return () => {
-      clearTimeout(syncTimer);
+      clearTimeout(syncTimeout);
       yTitle.unobserve(onTitleChange);
       yContent.unobserve(onContentChange);
+      ydoc.off('update', onRemoteUpdate);
       provider.destroyWithClient(supabase);
       providerRef.current = null;
       ydoc.destroy();
       ydocRef.current = null;
     };
+    // We intentionally exclude initialTitle/initialContent from deps —
+    // the Y.Doc is seeded once on mount; subsequent DB saves come back
+    // via the provider's sync, not via prop changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId]);
 
-  // When the parent loads a fresh note from DB (navigating between notes),
-  // reseed the Y.Doc if the Y.Text is still empty (first open, no peers yet).
-  useEffect(() => {
-    const ydoc = ydocRef.current;
-    if (!ydoc) return;
-    const yTitle = ydoc.getText('title');
-    const yContent = ydoc.getText('content');
-    ydoc.transact(() => {
-      if (yTitle.toString() !== initialTitle) {
-        yTitle.delete(0, yTitle.length);
-        if (initialTitle) yTitle.insert(0, initialTitle);
-      }
-      if (yContent.toString() !== initialContent) {
-        yContent.delete(0, yContent.length);
-        if (initialContent) yContent.insert(0, initialContent);
-      }
-    }, 'remote-load');
-    setTitleState(initialTitle);
-    setContentState(initialContent);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTitle, initialContent]);
+  // ── Public setters ────────────────────────────────────────────────────────
+  // These write minimal diffs into Y.Text so concurrent edits on different
+  // parts of the string merge correctly instead of clobbering each other.
 
-  // Public setters — write into Y.Doc so changes broadcast to peers
   const setTitle = useCallback((val: string) => {
     const ydoc = ydocRef.current;
     if (!ydoc) { setTitleState(val); return; }
     const yTitle = ydoc.getText('title');
     const current = yTitle.toString();
     if (current === val) return;
-    // Compute a simple diff: replace entire content
-    // For a title field this is fine; for body content Yjs handles merges anyway.
+    const { start, deleteCount, insert } = computeDiff(current, val);
     ydoc.transact(() => {
-      yTitle.delete(0, yTitle.length);
-      if (val) yTitle.insert(0, val);
+      if (deleteCount > 0) yTitle.delete(start, deleteCount);
+      if (insert) yTitle.insert(start, insert);
     }, 'local');
-    setTitleState(val);
   }, []);
 
   const setContent = useCallback((val: string) => {
@@ -140,11 +160,11 @@ export function useYjsNote(noteId: string | undefined, initialTitle: string, ini
     const yContent = ydoc.getText('content');
     const current = yContent.toString();
     if (current === val) return;
+    const { start, deleteCount, insert } = computeDiff(current, val);
     ydoc.transact(() => {
-      yContent.delete(0, yContent.length);
-      if (val) yContent.insert(0, val);
+      if (deleteCount > 0) yContent.delete(start, deleteCount);
+      if (insert) yContent.insert(start, insert);
     }, 'local');
-    setContentState(val);
   }, []);
 
   return { title, content, setTitle, setContent, isSyncing };

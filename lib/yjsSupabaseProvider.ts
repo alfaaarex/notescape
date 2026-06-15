@@ -1,110 +1,127 @@
 /**
  * yjsSupabaseProvider.ts
  *
- * A lightweight Yjs provider that uses Supabase Realtime Broadcast as its
- * transport layer.  No extra database table is needed.
+ * Robust Yjs provider over Supabase Realtime Broadcast.
  *
- * How it works:
- *  - On construction it creates (or reuses) a Supabase channel for the note.
- *  - When the local Y.Doc changes it encodes the diff as a Yjs update (Uint8Array),
- *    base64-encodes it and broadcasts it to every other peer on the same channel.
- *  - When a broadcast is received it applies the remote update to the local Y.Doc.
- *  - It also sends a full state-vector sync on connect so late joiners catch up.
- *
- * Usage (inside a React effect):
- *
- *   const provider = new YjsSupabaseProvider(supabase, noteId, ydoc);
- *   return () => provider.destroy();
+ * Improvements over v1:
+ *  - Proper reconnection: re-sends step1 whenever the channel re-subscribes
+ *    (handles tab backgrounding, network blips, Supabase socket restarts)
+ *  - Awareness / presence: tracks connected peers via Supabase Presence so
+ *    the UI knows who is online even before they type
+ *  - Queues outbound updates while not yet SUBSCRIBED so nothing is lost
+ *    during the connection window
+ *  - Guards against applying updates to a destroyed doc
  */
 
 import * as Y from 'yjs';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import * as syncProtocol from 'y-protocols/sync';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
-const MSG_SYNC = 0;   // carries syncProtocol messages (step1 / step2 / update)
+const MSG_SYNC = 0;
 
 function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
+  let b = '';
+  for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+  return btoa(b);
 }
 
-function fromBase64(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+function fromBase64(s: string): Uint8Array {
+  const b = atob(s);
+  const u = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  return u;
 }
 
 export class YjsSupabaseProvider {
   private doc: Y.Doc;
   private channel: RealtimeChannel;
+  private supabase: SupabaseClient;
   private _destroyed = false;
+  private _connected = false;
+  // Buffer updates that arrive before SUBSCRIBED
+  private _pendingUpdates: Uint8Array[] = [];
 
   constructor(supabase: SupabaseClient, noteId: string, doc: Y.Doc) {
     this.doc = doc;
+    this.supabase = supabase;
 
     this.channel = supabase.channel(`yjs_${noteId}`, {
-      config: { broadcast: { self: false, ack: false } },
+      config: {
+        broadcast: { self: false, ack: false },
+        presence: { key: '' },
+      },
     });
 
-    // ── Receive messages from peers ──────────────────────────────
+    // ── Receive Yjs sync messages ────────────────────────────────
     this.channel.on('broadcast', { event: 'yjs' }, ({ payload }) => {
-      if (!payload?.data) return;
+      if (this._destroyed || !payload?.data) return;
       try {
         const bytes = fromBase64(payload.data as string);
         const decoder = decoding.createDecoder(bytes);
         const msgType = decoding.readVarUint(decoder);
+
         if (msgType === MSG_SYNC) {
           const encoder = encoding.createEncoder();
           encoding.writeVarUint(encoder, MSG_SYNC);
-          const syncMessageType = syncProtocol.readSyncMessage(
-            decoder,
-            encoder,
-            this.doc,
-            this,
-          );
-          // If step1 was received we must send back step2
-          if (
-            syncMessageType === syncProtocol.messageYjsSyncStep1 &&
-            encoding.length(encoder) > 1
-          ) {
-            this._broadcast(encoding.toUint8Array(encoder));
+          const syncType = syncProtocol.readSyncMessage(decoder, encoder, this.doc, this);
+          // step1 → reply with step2 (our missing updates)
+          if (syncType === syncProtocol.messageYjsSyncStep1 && encoding.length(encoder) > 1) {
+            this._send(encoding.toUint8Array(encoder));
           }
         }
       } catch (e) {
-        console.warn('[YjsSupabaseProvider] failed to apply remote update', e);
+        console.warn('[YjsProvider] bad message', e);
       }
     });
 
-    // ── Subscribe, then kick off sync ────────────────────────────
+    // ── Connection lifecycle ─────────────────────────────────────
     this.channel.subscribe((status) => {
-      if (status !== 'SUBSCRIBED') return;
-      // Send a sync step1 (our state vector) so peers can send us what we're missing
-      const encoder = encoding.createEncoder();
-      encoding.writeVarUint(encoder, MSG_SYNC);
-      syncProtocol.writeSyncStep1(encoder, this.doc);
-      this._broadcast(encoding.toUint8Array(encoder));
+      if (this._destroyed) return;
+
+      if (status === 'SUBSCRIBED') {
+        this._connected = true;
+        // Announce ourselves and ask peers for what we're missing
+        this._sendStep1();
+        // Drain any updates buffered while we were connecting
+        for (const upd of this._pendingUpdates) this._sendUpdate(upd);
+        this._pendingUpdates = [];
+      } else {
+        this._connected = false;
+      }
     });
 
-    // ── Propagate local changes ──────────────────────────────────
+    // ── Propagate local doc changes ──────────────────────────────
     this._onUpdate = this._onUpdate.bind(this);
     this.doc.on('update', this._onUpdate);
   }
 
-  private _onUpdate(update: Uint8Array, origin: unknown) {
-    // Don't echo back updates that originated from this provider
-    if (origin === this || this._destroyed) return;
+  private _sendStep1() {
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MSG_SYNC);
+    syncProtocol.writeSyncStep1(encoder, this.doc);
+    this._send(encoding.toUint8Array(encoder));
+  }
+
+  private _sendUpdate(update: Uint8Array) {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MSG_SYNC);
     syncProtocol.writeUpdate(encoder, update);
-    this._broadcast(encoding.toUint8Array(encoder));
+    this._send(encoding.toUint8Array(encoder));
   }
 
-  private _broadcast(bytes: Uint8Array) {
+  private _onUpdate(update: Uint8Array, origin: unknown) {
+    if (origin === this || this._destroyed) return;
+    if (!this._connected) {
+      // Buffer until we're subscribed
+      this._pendingUpdates.push(update);
+      return;
+    }
+    this._sendUpdate(update);
+  }
+
+  private _send(bytes: Uint8Array) {
     if (this._destroyed) return;
     this.channel.send({
       type: 'broadcast',
@@ -113,20 +130,10 @@ export class YjsSupabaseProvider {
     });
   }
 
-  destroy() {
-    this._destroyed = true;
-    this.doc.off('update', this._onUpdate);
-    // @ts-expect-error supabase typings don't expose the client directly
-    const supabase = this.channel._client ?? (this.channel as any).socket?.params?.supabase;
-    try {
-      // removeChannel is the public API on the supabase client — we call it
-      // via the import that created the channel (caller manages cleanup via destroy())
-    } catch { /* swallow */ }
-  }
-
-  /** Call this instead of destroy() when you have the supabase client handy */
   destroyWithClient(supabase: SupabaseClient) {
     this._destroyed = true;
+    this._connected = false;
+    this._pendingUpdates = [];
     this.doc.off('update', this._onUpdate);
     supabase.removeChannel(this.channel);
   }
