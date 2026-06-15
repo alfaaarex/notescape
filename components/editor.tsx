@@ -13,8 +13,8 @@ import {
   CheckSquare,
   Code,
   Copy,
+  Columns2,
   Eye,
-  EyeOff,
   Focus,
   Heading1,
   Heading2,
@@ -27,7 +27,7 @@ import {
   Loader2,
   Minus,
   Palette,
-  PanelRight,
+  Pencil,
   Pin,
   PinOff,
   Quote,
@@ -296,7 +296,7 @@ export const Editor = ({
   } | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [tagInput, setTagInput] = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<'edit' | 'preview' | 'split'>('edit');
   const [focusMode, setFocusMode] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
@@ -335,7 +335,6 @@ export const Editor = ({
     }
     setSaveStatus('idle');
     setSlashOpen(false);
-    setPreviewOpen(false);
     setSummaryData(null);
     setSummaryError(null);
   }, [note]);
@@ -756,7 +755,7 @@ Rules:
             <ArrowLeft size={17} />
           </button>
 
-          <div className="hidden items-center gap-1 rounded-lg bg-white/55 p-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 md:flex">
+          <div className={`hidden items-center gap-1 rounded-lg bg-white/55 p-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 ${editorMode === 'preview' ? 'md:hidden' : 'md:flex'}`}>
             <ToolbarButton label="Heading" onClick={() => insertText('## ', '', 'Heading', true)} icon={<Heading2 size={15} />} />
             <ToolbarButton label="Bold" onClick={() => insertMarkdown('**')} icon={<Bold size={15} />} />
             <ToolbarButton label="Italic" onClick={() => insertMarkdown('*')} icon={<Italic size={15} />} />
@@ -770,13 +769,32 @@ Rules:
 
           <div className="flex-1" />
 
-          <button
-            onClick={() => setPreviewOpen((open) => !open)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${previewOpen ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
-          >
-            {previewOpen ? <EyeOff size={14} /> : <Eye size={14} />}
-            Preview
-          </button>
+          <div className="hidden items-center rounded-lg bg-white/55 p-0.5 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 sm:flex">
+            <button
+              onClick={() => setEditorMode('edit')}
+              title="Edit mode"
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'edit' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+            >
+              <Pencil size={13} />
+              Edit
+            </button>
+            <button
+              onClick={() => setEditorMode('split')}
+              title="Split mode"
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'split' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+            >
+              <Columns2 size={13} />
+              Split
+            </button>
+            <button
+              onClick={() => setEditorMode('preview')}
+              title="Preview mode"
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'preview' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+            >
+              <Eye size={13} />
+              Preview
+            </button>
+          </div>
 
           <button
             onClick={() => setFocusMode((open) => !open)}
@@ -866,129 +884,164 @@ Rules:
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10 md:px-16 lg:px-24">
-            <div className="mx-auto flex w-full max-w-3xl flex-col">
-              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
-                <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
-                <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
-                {pinned && <span className="rounded-full bg-gray-950 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-zinc-950">Pinned</span>}
-              </div>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* ── Edit pane ── hidden in preview mode */}
+          <AnimatePresence initial={false}>
+            {editorMode !== 'preview' && (
+              <motion.div
+                key="edit-pane"
+                initial={editorMode === 'split' ? { opacity: 0, x: -16 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.18 }}
+                className={`min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10 ${editorMode === 'split' ? 'border-r border-black/5 dark:border-white/10 md:px-10 lg:px-12' : 'md:px-16 lg:px-24'}`}
+              >
+                <div className="mx-auto flex w-full max-w-3xl flex-col">
+                  <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
+                    <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
+                    <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
+                    {pinned && <span className="rounded-full bg-gray-950 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-zinc-950">Pinned</span>}
+                  </div>
 
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                placeholder="Untitled"
-                className="mb-5 w-full border-none bg-transparent text-4xl font-bold leading-tight tracking-tight text-gray-950 outline-none placeholder:text-gray-300 dark:text-zinc-50 dark:placeholder:text-zinc-700 sm:text-5xl"
-              />
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => handleChange('title', e.target.value)}
+                    placeholder="Untitled"
+                    className="mb-5 w-full border-none bg-transparent text-4xl font-bold leading-tight tracking-tight text-gray-950 outline-none placeholder:text-gray-300 dark:text-zinc-50 dark:placeholder:text-zinc-700 sm:text-5xl"
+                  />
 
-              <div className="mb-6 flex flex-wrap items-center gap-1.5">
-                {tags.map((tag) => (
-                  <span key={tag} className="flex items-center gap-1 rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">
-                    #{tag}
-                    <button onClick={() => handleChange('tags', tags.filter((t) => t !== tag))} className="rounded-full p-0.5 transition-colors hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/10 dark:hover:text-red-300" aria-label={`Remove ${tag} tag`}>
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onBlur={() => tagInput.trim() && addTag()}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ',') {
-                      e.preventDefault();
-                      addTag();
-                    }
-                  }}
-                  placeholder="+ tag"
-                  className="w-20 border-none bg-transparent text-xs text-gray-500 outline-none placeholder:text-gray-400 dark:text-zinc-400 dark:placeholder:text-zinc-600"
-                />
-              </div>
+                  <div className="mb-6 flex flex-wrap items-center gap-1.5">
+                    {tags.map((tag) => (
+                      <span key={tag} className="flex items-center gap-1 rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">
+                        #{tag}
+                        <button onClick={() => handleChange('tags', tags.filter((t) => t !== tag))} className="rounded-full p-0.5 transition-colors hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/10 dark:hover:text-red-300" aria-label={`Remove ${tag} tag`}>
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onBlur={() => tagInput.trim() && addTag()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault();
+                          addTag();
+                        }
+                      }}
+                      placeholder="+ tag"
+                      className="w-20 border-none bg-transparent text-xs text-gray-500 outline-none placeholder:text-gray-400 dark:text-zinc-400 dark:placeholder:text-zinc-600"
+                    />
+                  </div>
 
-              <div className="relative">
-                <textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={handleContentChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Start writing... type '/' for commands"
-                  className="min-h-[520px] w-full flex-1 resize-none border-none bg-transparent text-[17px] leading-[1.85] text-gray-700 outline-none placeholder:text-gray-300 dark:text-zinc-300 dark:placeholder:text-zinc-700"
-                  spellCheck
-                />
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={handleContentChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Start writing... type '/' for commands"
+                      className="min-h-[520px] w-full flex-1 resize-none border-none bg-transparent text-[17px] leading-[1.85] text-gray-700 outline-none placeholder:text-gray-300 dark:text-zinc-300 dark:placeholder:text-zinc-700"
+                      spellCheck
+                    />
 
-                <AnimatePresence>
-                  {slashOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      transition={{ duration: 0.14 }}
-                      className="absolute left-0 top-10 z-50 w-[min(26rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-zinc-800">
-                        <AlignLeft size={14} className="text-gray-400 dark:text-zinc-500" />
-                        <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Type to filter commands</span>
-                        <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-zinc-800 dark:text-zinc-500">Esc</span>
-                      </div>
+                    <AnimatePresence>
+                      {slashOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                          transition={{ duration: 0.14 }}
+                          className="absolute left-0 top-10 z-50 w-[min(26rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+                        >
+                          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-zinc-800">
+                            <AlignLeft size={14} className="text-gray-400 dark:text-zinc-500" />
+                            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Type to filter commands</span>
+                            <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-zinc-800 dark:text-zinc-500">Esc</span>
+                          </div>
 
-                      {filteredCommands.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-zinc-500">No command found for &ldquo;{slashQuery}&rdquo;</div>
-                      ) : (
-                        <div className="max-h-80 overflow-y-auto p-1.5">
-                          {Object.entries(groupedCommands).map(([category, commands]) => (
-                            <div key={category} className="py-1">
-                              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{category}</div>
-                              {commands.map((cmd) => {
-                                const flatIndex = filteredCommands.findIndex((item) => item.id === cmd.id);
-                                const active = activeCommand?.id === cmd.id;
-                                return (
-                                  <button
-                                    key={cmd.id}
-                                    onClick={() => executeSlashCommand(cmd)}
-                                    onMouseEnter={() => setSlashIndex(flatIndex)}
-                                    className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}
-                                  >
-                                    <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white dark:bg-zinc-950/10 dark:text-zinc-950' : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
-                                      {cmd.icon}
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                      <span className="block text-sm font-semibold">{cmd.label}</span>
-                                      <span className={`block truncate text-xs ${active ? 'text-white/65 dark:text-zinc-600' : 'text-gray-400 dark:text-zinc-500'}`}>{cmd.description}</span>
-                                    </span>
-                                  </button>
-                                );
-                              })}
+                          {filteredCommands.length === 0 ? (
+                            <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-zinc-500">No command found for &ldquo;{slashQuery}&rdquo;</div>
+                          ) : (
+                            <div className="max-h-80 overflow-y-auto p-1.5">
+                              {Object.entries(groupedCommands).map(([category, commands]) => (
+                                <div key={category} className="py-1">
+                                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{category}</div>
+                                  {commands.map((cmd) => {
+                                    const flatIndex = filteredCommands.findIndex((item) => item.id === cmd.id);
+                                    const active = activeCommand?.id === cmd.id;
+                                    return (
+                                      <button
+                                        key={cmd.id}
+                                        onClick={() => executeSlashCommand(cmd)}
+                                        onMouseEnter={() => setSlashIndex(flatIndex)}
+                                        className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}
+                                      >
+                                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white dark:bg-zinc-950/10 dark:text-zinc-950' : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                                          {cmd.icon}
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                          <span className="block text-sm font-semibold">{cmd.label}</span>
+                                          <span className={`block truncate text-xs ${active ? 'text-white/65 dark:text-zinc-600' : 'text-gray-400 dark:text-zinc-500'}`}>{cmd.description}</span>
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ))}
                             </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── Preview pane ── shown in preview and split modes ── */}
+          <AnimatePresence initial={false}>
+            {editorMode !== 'edit' && (
+              <motion.div
+                key="preview-pane"
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                transition={{ duration: 0.18 }}
+                className={`min-w-0 overflow-y-auto bg-white/65 backdrop-blur-xl dark:bg-zinc-900/70 ${editorMode === 'preview' ? 'flex-1 px-5 py-8 sm:px-10 md:px-16 lg:px-24' : 'flex-1 px-6 py-8 lg:px-10'}`}
+              >
+                <div className={`mx-auto w-full max-w-3xl ${editorMode === 'split' ? 'max-w-none' : ''}`}>
+                  {/* In preview mode, show the title too */}
+                  {editorMode === 'preview' && (
+                    <>
+                      <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
+                        <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
+                        <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
+                      </div>
+                      <h1 className="mb-6 text-4xl font-bold tracking-tight text-gray-950 dark:text-zinc-50 sm:text-5xl">{title || <span className="text-gray-300 dark:text-zinc-700">Untitled</span>}</h1>
+                      {tags.length > 0 && (
+                        <div className="mb-8 flex flex-wrap gap-1.5">
+                          {tags.map((tag) => (
+                            <span key={tag} className="rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">#{tag}</span>
                           ))}
                         </div>
                       )}
-                    </motion.div>
+                    </>
                   )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </div>
-
-          <AnimatePresence initial={false}>
-            {previewOpen && (
-              <motion.aside
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 380, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-                className="min-w-0 border-l border-black/5 bg-white/65 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/70"
-              >
-                <div className="flex h-14 items-center gap-2 border-b border-black/5 px-4 text-sm font-semibold text-gray-700 dark:border-white/10 dark:text-zinc-300">
-                  <PanelRight size={16} />
-                  Preview
+                  {/* Split mode: small label */}
+                  {editorMode === 'split' && (
+                    <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 dark:text-zinc-600">
+                      <Eye size={11} /> Preview
+                    </div>
+                  )}
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    {renderPreview(content)}
+                  </div>
                 </div>
-                <div className="h-[calc(100%-3.5rem)] overflow-y-auto p-6">
-                  <div className="prose prose-sm max-w-none dark:prose-invert">{renderPreview(content)}</div>
-                </div>
-              </motion.aside>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>

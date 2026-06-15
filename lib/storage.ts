@@ -221,20 +221,33 @@ export const useNotes = () => {
 
   const getCollaborators = useCallback(async (noteId: string): Promise<Collaborator[]> => {
     if (!user) return [];
-    // Use explicit join syntax — note_collaborators.user_id → profiles.id
-    const { data, error } = await supabase
+
+    // Step 1: fetch collaborator rows
+    const { data: collabData, error: collabError } = await supabase
       .from('note_collaborators')
-      .select('note_id, user_id, role, created_at, profiles:user_id(id, email, full_name, avatar_url)')
+      .select('note_id, user_id, role, created_at')
       .eq('note_id', noteId);
-    
-    if (error) {
-      console.error('Error fetching collaborators:', error);
+
+    if (collabError) {
+      console.error('Error fetching collaborators:', collabError);
       return [];
     }
-    
-    return (data || []).map((c: any) => {
-      // profiles may be an object or array depending on Supabase version
-      const p = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+    if (!collabData || collabData.length === 0) return [];
+
+    // Step 2: fetch profiles for those user IDs in one query
+    const userIds = collabData.map((c: any) => c.user_id);
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url')
+      .in('id', userIds);
+
+    const profileMap: Record<string, any> = {};
+    for (const p of profileData || []) {
+      profileMap[p.id] = p;
+    }
+
+    return collabData.map((c: any) => {
+      const p = profileMap[c.user_id];
       return {
         noteId: c.note_id,
         userId: c.user_id,

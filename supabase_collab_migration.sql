@@ -42,3 +42,35 @@ WHERE share_slug IS NOT NULL;
 
 -- Sanity check — list public notes with their short links:
 -- SELECT id, title, share_slug, is_public FROM notes WHERE is_public = true;
+
+
+-- ============================================================
+-- FIX: Add FK from note_collaborators.user_id → profiles.id
+-- This was missing — the original FK only pointed to auth.users,
+-- which is why Supabase's auto-join returned null for profiles.
+-- ============================================================
+
+-- Add the FK (safe — only adds if not already present)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'note_collaborators_user_id_profiles_fkey'
+      AND table_name = 'note_collaborators'
+  ) THEN
+    ALTER TABLE note_collaborators
+      ADD CONSTRAINT note_collaborators_user_id_profiles_fkey
+      FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Backfill profiles for any auth.users who signed up before the trigger existed
+-- (safe to run multiple times — ON CONFLICT DO NOTHING)
+INSERT INTO public.profiles (id, email, full_name, avatar_url)
+SELECT
+  id,
+  email,
+  raw_user_meta_data->>'full_name',
+  raw_user_meta_data->>'avatar_url'
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
