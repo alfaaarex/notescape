@@ -276,7 +276,7 @@ export function ShareSheet({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 48, scale: 0.98 }}
         transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-        className="relative w-full sm:max-w-[480px] max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-2xl shadow-2xl"
+        className="relative w-full sm:max-w-[480px] max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
         style={{ background: 'var(--sheet-bg, white)' }}
       >
         {/* Frosted glass overlay */}
@@ -333,7 +333,7 @@ export function ShareSheet({
           </div>
 
           {/* ── Scrollable body ── */}
-          <div className="flex-1 overflow-y-visible px-5 pb-6">
+          <div className="flex-1 overflow-y-auto px-5 pb-8">
             <AnimatePresence mode="wait" initial={false}>
 
               {/* ════════════════════ SHARE TAB ════════════════════ */}
@@ -386,7 +386,7 @@ export function ShareSheet({
                         {toggling ? (
                           <Loader2 size={10} className="absolute inset-0 m-auto animate-spin text-white" />
                         ) : (
-                          <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isPublic ? 'translate-x-5' : 'translate-x-1'}`} />
+                          <span className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${isPublic ? 'translate-x-5' : 'translate-x-0'}`} />
                         )}
                       </button>
                     </div>
@@ -433,36 +433,36 @@ export function ShareSheet({
                             </div>
 
                             {/* Share actions */}
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 onClick={() => setShowQR((v) => !v)}
-                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors border ${showQR
+                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors border whitespace-nowrap ${showQR
                                   ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-400'
                                   : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600'
                                   }`}
                               >
-                                <QrCode size={12} />QR
+                                <QrCode size={12} />QR Code
                               </button>
                               <a
                                 href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shortUrl)}&text=${encodeURIComponent(noteTitle || 'Check out this note')}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors whitespace-nowrap"
                               >
                                 <Twitter size={12} />Post
                               </a>
                               <a
                                 href={`mailto:?subject=${encodeURIComponent(noteTitle || 'Shared note')}&body=${encodeURIComponent(shortUrl)}`}
-                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors whitespace-nowrap"
                               >
                                 <Mail size={12} />Email
                               </a>
                               <button
                                 onClick={() => handleCopy('embed')}
-                                className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                                className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 transition-colors whitespace-nowrap"
                               >
                                 {copied === 'embed' ? <Check size={12} /> : null}
-                                {copied === 'embed' ? 'Copied!' : '</>Embed'}
+                                {copied === 'embed' ? 'Copied!' : '</> Embed'}
                               </button>
                             </div>
 
