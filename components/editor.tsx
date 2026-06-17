@@ -43,7 +43,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Note } from '@/lib/storage';
-import type { Collaborator, CollaboratorRole, Profile } from '@/lib/types';
+import type { Collaborator, CollaboratorRole } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
 import { ShareSheet } from '@/components/share-sheet';
 import { useAuth } from '@/components/auth-provider';
@@ -60,6 +60,21 @@ interface EditorProps {
   addCollaborator?: (noteId: string, email: string, role: CollaboratorRole) => Promise<{ error?: string; success?: boolean }>;
   removeCollaborator?: (noteId: string, userId: string) => Promise<void>;
   updateCollaborator?: (noteId: string, userId: string, role: CollaboratorRole) => Promise<void>;
+}
+
+interface DbNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  color: string;
+  summary?: string | null;
+  tags: string[];
+  pinned: boolean;
+  updated_at: number;
+  is_public: boolean;
+  share_token?: string | null;
+  share_slug?: string | null;
 }
 
 const colorMap: Record<string, { label: string; hex: string; ring: string }> = {
@@ -290,7 +305,7 @@ export const Editor = ({
   const [color, setColor] = useState('alabaster');
   const [tags, setTags] = useState<string[]>([]);
   const [pinned, setPinned] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
@@ -312,7 +327,14 @@ export const Editor = ({
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
-  const [presentUsers, setPresentUsers] = useState<Record<string, any>>({});
+  interface PresenceUser {
+    id: string;
+    email: string;
+    fullName?: string | null;
+    avatarUrl?: string | null;
+  }
+
+  const [presentUsers, setPresentUsers] = useState<Record<string, PresenceUser>>({});
 
   const { user } = useAuth();
 
@@ -345,7 +367,7 @@ export const Editor = ({
     setShowMobileMore(false);
     setSummaryData(null);
     setSummaryError(null);
-  }, [note?.id]);
+  }, [note]);
 
   // Realtime subscription for the current note (non-Yjs fields only: color, pinned, isPublic)
   // Dependency array is ONLY note?.id — we don't want to re-subscribe on every keystroke.
@@ -369,7 +391,7 @@ export const Editor = ({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}` },
         (payload) => {
-          const newData = payload.new as any;
+          const newData = payload.new as DbNote;
           if (!newData) return;
 
           // Ignore our own echoed saves (within a 3-second window)
@@ -387,13 +409,20 @@ export const Editor = ({
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
   // Broadcast ref so we can send typing events from triggerSave without re-subscribing
   const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  interface TypingUser {
+    userId: string;
+    email: string;
+    fullName?: string | null;
+    avatarUrl?: string | null;
+    at: number;
+  }
+
   // Typing indicators: map of userId -> { email, fullName, avatarUrl, at: timestamp }
-  const [typingUsers, setTypingUsers] = useState<Record<string, any>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, TypingUser>>({});
 
   // Combined presence + broadcast channel for live collaboration
   useEffect(() => {
@@ -408,9 +437,9 @@ export const Editor = ({
     // Presence: who is viewing/editing right now
     colabChannel.on('presence', { event: 'sync' }, () => {
       const state = colabChannel.presenceState();
-      const users: Record<string, any> = {};
+      const users: Record<string, PresenceUser> = {};
       for (const id in state) {
-        users[id] = (state[id] as any[])[0];
+        users[id] = (state[id] as PresenceUser[])[0];
       }
       setPresentUsers(users);
     });
@@ -420,7 +449,7 @@ export const Editor = ({
       if (!payload || payload.userId === user.id) return;
       setTypingUsers((prev) => ({
         ...prev,
-        [payload.userId]: { ...payload, at: Date.now() },
+        [payload.userId]: { ...payload, at: Date.now() } as TypingUser,
       }));
     });
 
@@ -489,12 +518,12 @@ export const Editor = ({
         setSaveStatus('saved');
       } catch (err) {
         console.error('Failed to save note:', err);
-        setSaveStatus('error' as any);
+        setSaveStatus('error');
         // Reset to idle after 3s so user can keep typing
         setTimeout(() => setSaveStatus('idle'), 3000);
       }
     }, 650);
-  }, [title, content, color, tags, pinned, isPublic, onSave]);
+  }, [title, content, color, tags, pinned, isPublic, onSave, user]);
 
   const handleChange = useCallback((field: 'title' | 'content' | 'color' | 'tags', value: string | string[]) => {
     if (field === 'title') setTitle(value as string);
@@ -505,7 +534,7 @@ export const Editor = ({
     }
     if (field === 'tags') setTags(value as string[]);
     setSaveStatus('saving');
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!title && !content) return;

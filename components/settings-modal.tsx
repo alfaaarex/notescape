@@ -41,15 +41,15 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   // Sync profile values when modal opens or user updates
   useEffect(() => {
     if (user) {
-      setName(user.user_metadata?.name || user.user_metadata?.full_name || '');
-      setEmail(user.email || '');
+      setName(prev => user.user_metadata?.name || user.user_metadata?.full_name || '');
+      setEmail(prev => user.email || '');
     }
   }, [user, open]);
 
   // Clean notices when tabs switch
   useEffect(() => {
-    setError('');
-    setSuccessMsg('');
+    setError(prev => '');
+    setSuccessMsg(prev => '');
   }, [activeTab]);
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -64,8 +64,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       });
       if (updateError) throw updateError;
       setSuccessMsg('Profile updated successfully!');
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update profile.';
+      setError(message);
     } finally {
       setSavingProfile(false);
     }
@@ -98,8 +99,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       setSuccessMsg('Password updated successfully!');
       setPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to update password.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update password.';
+      setError(message);
     } finally {
       setSavingSecurity(false);
     }
@@ -142,8 +144,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
       if (updateError) throw updateError;
       setSuccessMsg('Profile picture updated successfully!');
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload profile picture.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to upload profile picture.';
+      setError(message);
     } finally {
       setUploading(false);
     }

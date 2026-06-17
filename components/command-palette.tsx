@@ -38,9 +38,11 @@ export function CommandPalette({
 
   useEffect(() => {
     if (open) {
-      setQuery('');
-      setActiveIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 80);
+      setTimeout(() => {
+        setQuery('');
+        setActiveIndex(0);
+        inputRef.current?.focus();
+      }, 80);
     }
   }, [open]);
 

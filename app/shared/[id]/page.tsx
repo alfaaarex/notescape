@@ -39,7 +39,7 @@ export default function SharedNotePage() {
             shareToken: data.share_token,
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching shared note:', err);
         setError('Note not found or is not public.');
       } finally {

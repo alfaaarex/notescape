@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, ArrowRight, Sparkles, BookOpen, CheckSquare, CalendarDays, Loader2, GitBranch } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Sparkles, BookOpen, CheckSquare, CalendarDays, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/components/auth-provider';
 
@@ -17,6 +17,7 @@ const FEATURES = [
 export default function LoginPage() {
   const router = useRouter();
   const { signInWithGoogle, signInWithGitHub } = useAuth();
+  // TODO: Implement social login buttons
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,8 +71,9 @@ export default function LoginPage() {
 
       setSuccess(true);
       setTimeout(() => router.push('/'), 600);
-    } catch (err: any) {
-      setError(err.message || 'An authentication error occurred.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'An authentication error occurred.';
+      setError(message);
     } finally {
       setLoading(false);
     }

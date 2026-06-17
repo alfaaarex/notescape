@@ -7,14 +7,10 @@ import { usePushNotifications } from '@/lib/usePushNotifications';
 
 export function NotificationBanner() {
   const { supported, permission, requestPermission } = usePushNotifications();
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    return typeof window !== 'undefined' && sessionStorage.getItem('notescape-notif-dismissed') === '1';
+  });
   const [requesting, setRequesting] = useState(false);
-
-  // Only show once per session; don't nag if already decided
-  useEffect(() => {
-    const alreadyDismissed = sessionStorage.getItem('notescape-notif-dismissed');
-    if (alreadyDismissed) setDismissed(true);
-  }, []);
 
   const dismiss = () => {
     setDismissed(true);

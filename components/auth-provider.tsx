@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
+import type { Note, Task } from '@/lib/types';
 import { supabase } from '@/lib/supabaseClient';
 
 interface AuthContextType {
@@ -118,7 +119,7 @@ async function migrateLocalData(userId: string) {
 
     // Sync Notes
     if (localNotes.length > 0) {
-      const notesToInsert = localNotes.map((note: any) => ({
+      const notesToInsert = localNotes.map((note: Note) => ({
         id: note.id,
         user_id: userId,
         title: note.title,
@@ -140,7 +141,7 @@ async function migrateLocalData(userId: string) {
 
     // Sync Tasks
     if (localTasks.length > 0) {
-      const tasksToInsert = localTasks.map((task: any) => ({
+      const tasksToInsert = localTasks.map((task: Task) => ({
         id: task.id,
         user_id: userId,
         title: task.title,
