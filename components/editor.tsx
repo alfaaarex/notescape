@@ -439,7 +439,7 @@ export const Editor = ({
       const state = colabChannel.presenceState();
       const users: Record<string, PresenceUser> = {};
       for (const id in state) {
-        users[id] = (state[id] as PresenceUser[])[0];
+        users[id] = (state[id] as unknown as PresenceUser[])[0];
       }
       setPresentUsers(users);
     });
@@ -1444,8 +1444,8 @@ Rules:
                               onClick={() => !already && handleAddSuggestedTag(tag)}
                               disabled={already}
                               className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${already
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 cursor-default'
-                                  : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 cursor-default'
+                                : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400'
                                 }`}
                             >
                               {already ? <Check size={10} /> : <Tag size={10} />}
