@@ -119,7 +119,7 @@ function TaskCard({
     <motion.div
       layout
       variants={item}
-      className="group relative bg-white dark:bg-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-700 p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+      className="group relative bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md rounded-xl border border-white/40 dark:border-white/10 p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
       style={{ borderLeft: `3px solid ${colorHex}` }}
     >
       <div className="flex items-start gap-2.5">
@@ -373,7 +373,7 @@ export function TaskBoard({
             variants={container}
             initial="hidden"
             animate="show"
-            className="flex flex-col divide-y divide-gray-100 dark:divide-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900"
+            className="flex flex-col divide-y divide-gray-100 dark:divide-zinc-800 rounded-xl border border-white/20 dark:border-white/10 overflow-hidden glass"
           >
             {/* Desktop header row — hidden on mobile */}
             <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-gray-50 dark:bg-zinc-800 text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">

@@ -216,3 +216,29 @@
     background: oklch(0.3 0 0);
   }
 }
+
+@layer utilities {
+  .bg-flowy {
+    background: linear-gradient(-45deg, var(--color-alabaster), var(--color-lavender), var(--color-slate), var(--color-sage));
+    background-size: 400% 400%;
+    animation: gradientFlow 15s ease infinite;
+  }
+  .dark .bg-flowy {
+    background: linear-gradient(-45deg, #0f0a14, #0a0b12, #140d12, #0d1214);
+    background-size: 400% 400%;
+    animation: gradientFlow 15s ease infinite;
+  }
+  
+  .glass {
+    @apply bg-white/40 backdrop-blur-lg border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+  .dark .glass {
+    @apply bg-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)];
+  }
+
+  @keyframes gradientFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}

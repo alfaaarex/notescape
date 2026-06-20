@@ -778,7 +778,7 @@ Rules:
     <div className={`relative flex h-full w-full overflow-hidden ${focusMode ? 'bg-white dark:bg-zinc-950' : ''}`}>
       <motion.div
         layoutId={note ? `note-${note.id}` : 'new-note'}
-        className="flex h-full flex-1 flex-col overflow-hidden bg-[var(--note-bg)] transition-colors duration-300 dark:bg-zinc-950"
+        className="flex h-full flex-1 flex-col overflow-hidden bg-[color-mix(in_srgb,var(--note-bg)_60%,transparent)] backdrop-blur-md transition-colors duration-300 dark:bg-zinc-950/60"
         style={{ '--note-bg': bgHex } as React.CSSProperties}
       >
         <header

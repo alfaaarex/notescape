@@ -84,7 +84,7 @@ export function Sidebar({
   const notesToRender = filteredNotes ?? unpinnedNotes;
 
   return (
-    <aside className="w-60 h-full bg-[#f7f7f5] dark:bg-zinc-950 border-r border-gray-200/60 dark:border-zinc-800 flex flex-col overflow-hidden">
+    <aside className="w-60 h-full glass border-r border-white/20 dark:border-white/10 flex flex-col overflow-hidden">
       {/* Logo + Command Button */}
       <div className="flex h-14 items-center justify-between px-4">
         <span className="text-[13px] font-bold tracking-widest text-gray-400 dark:text-zinc-500 uppercase select-none">
