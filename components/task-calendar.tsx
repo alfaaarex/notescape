@@ -611,7 +611,7 @@ export function TaskCalendar({ tasks, onNewTask, onEditTask }: TaskCalendarProps
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-transparent">
+    <div className="flex flex-col h-full overflow-hidden bg-white dark:bg-zinc-900">
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-zinc-800">
         <div className="flex items-center gap-1">
           <button

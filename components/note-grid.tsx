@@ -76,7 +76,7 @@ export function NoteGrid({ notes, onSelectNote, onDeleteNote }: NoteGridProps) {
 
   if (notes.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 bg-transparent px-6 py-24 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-5 bg-[#fbfbfa] px-6 py-24 text-center dark:bg-zinc-900">
         <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-zinc-800 dark:ring-zinc-700">
           <FileText className="h-10 w-10 text-gray-300 dark:text-zinc-600" />
         </div>
@@ -89,9 +89,9 @@ export function NoteGrid({ notes, onSelectNote, onDeleteNote }: NoteGridProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-transparent">
+    <div className="h-full overflow-y-auto bg-[#fbfbfa] dark:bg-zinc-900">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-5 sm:p-8">
-        <section className="rounded-2xl border border-white/20 glass p-5 shadow-sm dark:border-white/10 dark:bg-zinc-950/40">
+        <section className="rounded-2xl border border-gray-200/70 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">

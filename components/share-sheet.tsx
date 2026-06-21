@@ -279,7 +279,7 @@ export function ShareSheet({
         style={{ background: 'var(--sheet-bg, white)' }}
       >
         {/* Frosted glass overlay */}
-        <div className="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl pointer-events-none rounded-t-3xl sm:rounded-2xl border border-white/20 dark:border-white/10" />
+        <div className="absolute inset-0 bg-white/90 dark:bg-zinc-900/95 backdrop-blur-xl pointer-events-none rounded-t-3xl sm:rounded-2xl" />
 
         {/* Content (above overlay) */}
         <div className="relative z-10 flex flex-col h-full max-h-[92vh]">

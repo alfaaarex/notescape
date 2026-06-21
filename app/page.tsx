@@ -104,10 +104,10 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-flowy text-gray-900 dark:text-zinc-100">
+      <div className="flex h-screen w-full items-center justify-center bg-[#f7f7f5] dark:bg-zinc-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-7 h-7 rounded-full border-2 border-indigo-200 border-t-indigo-600 dark:border-indigo-800 dark:border-t-indigo-400 animate-spin" />
-          <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-widest">Loading workspace</p>
+          <div className="w-7 h-7 rounded-full border-2 border-gray-200 border-t-gray-700 animate-spin" />
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Loading workspace</p>
         </div>
       </div>
     );
@@ -117,7 +117,7 @@ export default function Home() {
 
   return (
     <>
-      <div className="flex h-screen bg-flowy font-sans selection:bg-indigo-200 selection:text-indigo-900 overflow-hidden">
+      <div className="flex h-screen bg-[#f7f7f5] dark:bg-zinc-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-hidden">
 
         {/* ── Mobile sidebar overlay ── */}
         <AnimatePresence>
@@ -157,9 +157,9 @@ export default function Home() {
         </div>
 
         {/* ── Main content ── */}
-        <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col m-2 ml-0 rounded-2xl shadow-xl glass overflow-hidden border border-white/40 dark:border-white/10">
+        <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-white dark:bg-zinc-900">
           {/* Mobile top bar */}
-          <div className="flex md:hidden items-center h-12 px-4 border-b border-gray-200/50 dark:border-zinc-800/50 flex-shrink-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md">
+          <div className="flex md:hidden items-center h-12 px-4 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0">
             <button
               onClick={() => setMobileSidebarOpen((o) => !o)}
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
