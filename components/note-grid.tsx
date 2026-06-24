@@ -1,18 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowDownAZ,
-  Clock3,
+  Clock,
   FileText,
-  Grid2X2,
-  LayoutList,
   Pin,
   Search,
   Sparkles,
-  Tag,
   Trash2,
+  List,
+  Grid
 } from 'lucide-react';
 import type { Note } from '@/lib/storage';
 
@@ -21,14 +19,6 @@ interface NoteGridProps {
   onSelectNote: (note: Note) => void;
   onDeleteNote: (id: string) => void;
 }
-
-const COLOR_HEX: Record<string, string> = {
-  alabaster: '#F9F9F6',
-  sage: '#EEF2EE',
-  linen: '#FDF8F5',
-  slate: '#F0F1F4',
-  lavender: '#F3EFFF',
-};
 
 const container = {
   hidden: { opacity: 0 },
@@ -76,280 +66,268 @@ export function NoteGrid({ notes, onSelectNote, onDeleteNote }: NoteGridProps) {
 
   if (notes.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 bg-[#fbfbfa] px-6 py-24 text-center dark:bg-zinc-900">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 dark:bg-zinc-800 dark:ring-zinc-700">
-          <FileText className="h-10 w-10 text-gray-300 dark:text-zinc-600" />
+      <div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center te-noise bg-background">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl te-inset border-border border shadow-inner">
+          <FileText className="h-10 w-10 text-muted-foreground" />
         </div>
         <div>
-          <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No notes yet</p>
-          <p className="mt-1 max-w-sm text-sm text-gray-400 dark:text-zinc-500">Create a note from the sidebar and it will appear here with tags, pins, and quick previews.</p>
+          <p className="text-xl font-bold font-sans">NO NOTES YET</p>
+          <p className="mt-2 max-w-sm text-xs font-mono text-muted-foreground">
+            // Create a note from the sidebar and it will appear here with tags, pins, and quick previews.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#fbfbfa] dark:bg-zinc-900">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-5 sm:p-8">
-        <section className="rounded-2xl border border-gray-200/70 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/60">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="h-full overflow-y-auto bg-background te-noise relative">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-5 sm:p-8 relative z-10">
+        
+        {/* Header Panel */}
+        <section className="rounded-xl te-surface p-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-                Notes workspace
+              <div className="mb-2 te-label flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full te-led te-led-on" />
+                SYSTEM / WORKSPACE
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-950 dark:text-zinc-50">Your notes</h1>
-              <p className="mt-2 max-w-2xl text-sm text-gray-500 dark:text-zinc-400">
-                Browse, filter, and jump back into your thinking without digging through the sidebar.
-              </p>
+              <h1 className="text-4xl font-bold tracking-tight uppercase te-emboss">Your Notes</h1>
+              
+              <div className="mt-5 flex flex-wrap gap-4 items-center">
+                <StatGauge label="TOTAL NOTES" value={notes.length} max={100} />
+                <StatGauge label="TOTAL WORDS" value={totalWords} max={10000} />
+                <StatGauge label="PINNED" value={notes.filter((n) => n.pinned).length} max={notes.length} />
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:min-w-[25rem]">
-              <Metric label="Notes" value={notes.length.toString()} />
-              <Metric label="Pinned" value={notes.filter((note) => note.pinned).length.toString()} />
-              <Metric label="Words" value={compactNumber(totalWords)} />
-            </div>
-          </div>
+            <div className="flex flex-col gap-3 min-w-[300px]">
+              {/* Debossed Search */}
+              <div className="relative rounded-lg te-inset flex items-center px-3 py-2">
+                {/* Screw accents */}
+                <div className="absolute top-1 left-1 w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
+                <div className="absolute top-1 right-1 w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
+                <div className="absolute bottom-1 left-1 w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
+                <div className="absolute bottom-1 right-1 w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
+                
+                <Search className="h-4 w-4 text-muted-foreground mx-1" />
+                <input
+                  type="text"
+                  placeholder="SEARCH..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="flex-1 bg-transparent border-none outline-none text-sm font-mono placeholder:text-muted-foreground/60 px-2 uppercase"
+                />
+              </div>
 
-          <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900">
-              <Search size={16} className="flex-shrink-0 text-gray-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search titles, note text, or tags..."
-                className="min-w-0 flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400 dark:text-zinc-200"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <ControlButton active={sortMode === 'recent'} onClick={() => setSortMode('recent')} icon={<Clock3 size={14} />} label="Recent" />
-              <ControlButton active={sortMode === 'title'} onClick={() => setSortMode('title')} icon={<ArrowDownAZ size={14} />} label="Title" />
-              <ControlButton active={sortMode === 'length'} onClick={() => setSortMode('length')} icon={<FileText size={14} />} label="Length" />
-              <div className="h-6 w-px bg-gray-200 dark:bg-zinc-800" />
-              <ControlButton active={viewMode === 'grid'} onClick={() => setViewMode('grid')} icon={<Grid2X2 size={14} />} label="Grid" compact />
-              <ControlButton active={viewMode === 'list'} onClick={() => setViewMode('list')} icon={<LayoutList size={14} />} label="List" compact />
+              {/* Controls Strip */}
+              <div className="flex items-center gap-3">
+                {/* Sort Toggle */}
+                <div className="flex flex-1 p-1 rounded-lg te-inset gap-1">
+                  {(['recent', 'title', 'length'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setSortMode(mode)}
+                      className={`flex-1 py-1.5 rounded text-[10px] font-mono font-bold tracking-widest transition-all ${
+                        sortMode === mode ? 'te-surface text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {mode.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                {/* View Toggle */}
+                <div className="flex p-1 rounded-lg te-inset gap-1">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded transition-all ${viewMode === 'grid' ? 'te-surface text-primary' : 'text-muted-foreground'}`}
+                  >
+                    <Grid size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-1.5 rounded transition-all ${viewMode === 'list' ? 'te-surface text-primary' : 'text-muted-foreground'}`}
+                  >
+                    <List size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
           {tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-6 pt-4 border-t border-border flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="te-label mr-2">FILTER:</span>
               <button
                 onClick={() => setSelectedTag(null)}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${!selectedTag ? 'border-gray-950 bg-gray-950 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950' : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900'}`}
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[10px] font-mono font-bold transition-all ${
+                  selectedTag === null
+                    ? 'te-button-primary'
+                    : 'te-button text-muted-foreground'
+                }`}
               >
-                All tags
+                ALL
               </button>
               {tags.map((tag) => (
                 <button
                   key={tag}
-                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${selectedTag === tag ? 'border-gray-950 bg-gray-950 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950' : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900'}`}
+                  onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                  className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[10px] font-mono font-bold transition-all ${
+                    selectedTag === tag
+                      ? 'te-button-primary'
+                      : 'te-button text-muted-foreground'
+                  }`}
                 >
-                  <Tag size={11} />
-                  {tag}
+                  #{tag.toUpperCase()}
                 </button>
               ))}
             </div>
           )}
         </section>
 
+        {/* Content */}
         {visibleNotes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center text-sm text-gray-400 dark:border-zinc-800 dark:bg-zinc-950/50">
-            No notes match that filter.
+          <div className="py-20 text-center te-label text-muted-foreground">
+            -- NO MATCHING RESULTS FOUND --
           </div>
         ) : (
-          <>
+          <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-8 pb-12">
             {pinned.length > 0 && (
-              <NoteSection
-                title="Pinned"
-                icon={<Pin size={13} />}
-                notes={pinned}
-                viewMode={viewMode}
-                onSelectNote={onSelectNote}
-                onDeleteNote={onDeleteNote}
-              />
+              <div>
+                <div className="mb-4 flex items-center gap-2 te-label">
+                  <Pin size={10} className="text-primary" />
+                  <span>PINNED NOTES</span>
+                </div>
+                <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+                  {pinned.map((note) => (
+                    <NoteCard key={note.id} note={note} onSelect={onSelectNote} onDelete={onDeleteNote} />
+                  ))}
+                </div>
+              </div>
             )}
-
-            <NoteSection
-              title={pinned.length > 0 ? 'All notes' : 'Latest notes'}
-              notes={unpinned}
-              viewMode={viewMode}
-              onSelectNote={onSelectNote}
-              onDeleteNote={onDeleteNote}
-            />
-          </>
+            {unpinned.length > 0 && (
+              <div>
+                {pinned.length > 0 && (
+                  <div className="mb-4 flex items-center gap-2 te-label">
+                    <FileText size={10} className="text-muted-foreground" />
+                    <span>ALL NOTES</span>
+                  </div>
+                )}
+                <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+                  {unpinned.map((note) => (
+                    <NoteCard key={note.id} note={note} onSelect={onSelectNote} onDelete={onDeleteNote} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
         )}
       </div>
     </div>
   );
 }
 
-function NoteSection({
-  title,
-  icon,
-  notes,
-  viewMode,
-  onSelectNote,
-  onDeleteNote,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  notes: Note[];
-  viewMode: ViewMode;
-  onSelectNote: (note: Note) => void;
-  onDeleteNote: (id: string) => void;
-}) {
-  if (notes.length === 0) return null;
-
+function NoteCard({ note, onSelect, onDelete }: { note: Note; onSelect: (note: Note) => void; onDelete: (id: string) => void }) {
+  const contentPreview = getPreview(note.content, 120);
+  
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">
-        {icon}
-        {title}
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400 dark:bg-zinc-800">{notes.length}</span>
-      </div>
-      <motion.div
-        className={viewMode === 'grid' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'flex flex-col gap-3'}
-        variants={container}
-        initial="hidden"
-        animate="show"
-      >
-        {notes.map((note) => (
-          <NoteCard key={note.id} note={note} viewMode={viewMode} onSelect={onSelectNote} onDelete={onDeleteNote} />
-        ))}
-      </motion.div>
-    </section>
-  );
-}
-
-function NoteCard({
-  note,
-  viewMode,
-  onSelect,
-  onDelete,
-}: {
-  note: Note;
-  viewMode: ViewMode;
-  onSelect: (n: Note) => void;
-  onDelete: (id: string) => void;
-}) {
-  const bg = COLOR_HEX[note.color] ?? COLOR_HEX.alabaster;
-  const words = countWords(note.content);
-  const preview = cleanPreview(note.content);
-
-  return (
-    <motion.article
+    <motion.div
       layoutId={`note-${note.id}`}
       variants={card}
-      whileHover={{ y: viewMode === 'grid' ? -3 : 0, boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)' }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -2 }}
+      className="group relative flex flex-col rounded-xl te-surface cursor-pointer hover:te-glow transition-all"
       onClick={() => onSelect(note)}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-black/[0.05] shadow-sm transition-colors duration-200 dark:border-white/5 ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : 'p-5'}`}
-      style={{ backgroundColor: bg }}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/45 to-transparent" />
-      {note.pinned && <Pin size={12} className="absolute right-4 top-4 rotate-45 text-gray-400" />}
-
-      <div className={viewMode === 'list' ? 'min-w-0 flex-1' : 'flex min-h-[155px] flex-col'}>
-        <div className="mb-3 flex items-center gap-2 pr-8">
-          <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full border border-black/10 bg-white/70" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{formatDate(note.updatedAt)}</span>
-        </div>
-
-        <h3 className="mb-2 line-clamp-2 text-[16px] font-bold leading-snug tracking-tight text-gray-950">
+      {/* Decorative tape / header strip */}
+      <div className="h-2 w-full rounded-t-xl bg-gradient-to-r from-border/50 to-transparent border-b border-border/50" />
+      
+      <div className="flex flex-1 flex-col p-4 relative">
+        {note.pinned && (
+          <div className="absolute top-3 right-3 text-primary drop-shadow-md">
+            <Pin size={14} fill="currentColor" className="rotate-45" />
+          </div>
+        )}
+        
+        <h3 className="text-base font-bold text-foreground line-clamp-2 pr-6">
           {note.title || 'Untitled'}
         </h3>
-        <p className={`${viewMode === 'list' ? 'line-clamp-1' : 'line-clamp-5 flex-1'} text-sm leading-relaxed text-gray-600`}>
-          {preview || 'Empty note'}
+        
+        <p className="mt-2 text-xs font-mono text-muted-foreground/80 leading-relaxed line-clamp-3 flex-1 break-words">
+          {contentPreview || '...'}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {note.tags?.slice(0, viewMode === 'list' ? 4 : 3).map((tag) => (
-            <span key={tag} className="rounded-full bg-white/55 px-2 py-1 text-[10px] font-semibold text-gray-500 ring-1 ring-black/5">
-              #{tag}
-            </span>
-          ))}
-          {note.tags && note.tags.length > (viewMode === 'list' ? 4 : 3) && (
-            <span className="text-[10px] font-semibold text-gray-400">+{note.tags.length - (viewMode === 'list' ? 4 : 3)}</span>
-          )}
-          <span className="ml-auto text-[10px] font-semibold uppercase tracking-widest text-gray-400">{words} words</span>
+        <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            {note.tags?.slice(0, 2).map((tag) => (
+              <span key={tag} className="px-1.5 py-0.5 rounded te-inset text-[9px] font-mono font-bold tracking-wider text-muted-foreground truncate uppercase border-none bg-muted/50">
+                {tag}
+              </span>
+            ))}
+            {note.tags && note.tags.length > 2 && (
+              <span className="text-[9px] font-mono text-muted-foreground">+{note.tags.length - 2}</span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div className="text-[9px] font-mono text-muted-foreground uppercase flex items-center gap-1">
+              <Clock size={9} />
+              {formatTimeAgo(note.updatedAt)}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(note.id);
+              }}
+              className="p-1.5 rounded-full bg-background border border-border shadow-sm text-muted-foreground opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:text-white hover:border-destructive -mr-1"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(note.id);
-        }}
-        className="absolute bottom-4 right-4 rounded-full bg-white/70 p-1.5 text-gray-400 opacity-0 shadow-sm ring-1 ring-black/5 backdrop-blur-sm transition-all duration-200 hover:bg-white hover:text-red-500 group-hover:opacity-100"
-        aria-label="Delete note"
-      >
-        <Trash2 size={13} />
-      </button>
-    </motion.article>
+    </motion.div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function StatGauge({ label, value, max }: { label: string; value: number; max: number }) {
+  const pct = Math.min((value / max) * 100, 100);
   return (
-    <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100 dark:bg-zinc-900 dark:ring-zinc-800">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
-      <p className="mt-1 text-xl font-bold text-gray-950 dark:text-zinc-50">{value}</p>
+    <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border/50">
+      <div className="flex flex-col">
+        <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">{label}</span>
+        <span className="text-sm font-mono font-bold text-primary leading-none mt-0.5">{value}</span>
+      </div>
+      <div className="w-16 h-1.5 rounded-full te-inset overflow-hidden">
+        <motion.div 
+          className="h-full bg-primary"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 1, ease: 'easeOut' }}
+        />
+      </div>
     </div>
   );
 }
 
-function ControlButton({
-  active,
-  onClick,
-  icon,
-  label,
-  compact = false,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  compact?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'bg-white text-gray-500 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-zinc-950 dark:text-zinc-400 dark:ring-zinc-800 dark:hover:bg-zinc-900'}`}
-      aria-label={label}
-      title={label}
-    >
-      {icon}
-      {!compact && <span>{label}</span>}
-    </button>
-  );
+function countWords(str: string): number {
+  return str.trim() ? str.trim().split(/\s+/).length : 0;
 }
 
-function cleanPreview(content: string) {
-  return content
-    .replace(/^#{1,6}\s/gm, '')
-    .replace(/^- \[[ xX]\]\s/gm, '')
-    .replace(/^[->]\s/gm, '')
-    .replace(/`{1,3}/g, '')
-    .replace(/\n+/g, ' ')
-    .trim();
+function getPreview(str: string, length = 120): string {
+  const plainText = str.replace(/[#*`_\[\]()]/g, '').trim();
+  if (plainText.length <= length) return plainText;
+  return plainText.substring(0, length) + '...';
 }
 
-function countWords(content: string) {
-  return content.trim() ? content.trim().split(/\s+/).length : 0;
-}
+function formatTimeAgo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
-function compactNumber(value: number) {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-}
-
-function formatDate(timestamp: number) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (diffMins < 1) return 'JUST NOW';
+  if (diffMins < 60) return `${diffMins}M AGO`;
+  if (diffHours < 24) return `${diffHours}H AGO`;
+  if (diffDays < 7) return `${diffDays}D AGO`;
+  return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
 }

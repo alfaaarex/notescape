@@ -104,10 +104,23 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#f7f7f5] dark:bg-zinc-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-7 h-7 rounded-full border-2 border-gray-200 border-t-gray-700 animate-spin" />
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Loading workspace</p>
+      <div className="flex h-screen w-full items-center justify-center bg-background te-noise te-grid-bg">
+        <div className="flex flex-col items-center gap-5 te-surface rounded-2xl px-10 py-8 relative">
+          <div className="absolute top-2 left-2 te-screw" />
+          <div className="absolute top-2 right-2 te-screw" />
+          <div className="absolute bottom-2 left-2 te-screw" />
+          <div className="absolute bottom-2 right-2 te-screw" />
+          <div className="te-lcd rounded-lg px-6 py-3 text-[11px] font-bold tracking-[0.2em] uppercase">
+            BOOTING...
+          </div>
+          <div className="w-32 h-1.5 rounded-full te-inset overflow-hidden">
+            <motion.div
+              className="h-full bg-primary"
+              animate={{ width: ['0%', '100%'] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </div>
+          <p className="te-label">NOTESCAPE / SYSTEM INIT</p>
         </div>
       </div>
     );
@@ -117,7 +130,8 @@ export default function Home() {
 
   return (
     <>
-      <div className="flex h-screen bg-[#f7f7f5] dark:bg-zinc-950 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-hidden">
+      <div className="flex h-screen bg-background font-sans overflow-hidden p-1.5 sm:p-2 md:p-3 te-chassis">
+        <div className="flex flex-1 min-w-0 overflow-hidden rounded-xl te-bezel relative te-noise flex-row">
 
         {/* ── Mobile sidebar overlay ── */}
         <AnimatePresence>
@@ -157,16 +171,20 @@ export default function Home() {
         </div>
 
         {/* ── Main content ── */}
-        <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-white dark:bg-zinc-900">
-          {/* Mobile top bar */}
-          <div className="flex md:hidden items-center h-12 px-4 border-b border-gray-100 dark:border-zinc-800 flex-shrink-0">
+        <main className="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-background">
+          {/* Mobile top bar — hardware status strip */}
+          <div className="flex md:hidden items-center h-11 px-3 border-b border-border flex-shrink-0 te-inset rounded-none">
             <button
               onClick={() => setMobileSidebarOpen((o) => !o)}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+              className="p-2 rounded-lg te-button text-muted-foreground"
             >
-              {mobileSidebarOpen ? <X size={18} /> : <Menu size={18} />}
+              {mobileSidebarOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
-            <span className="ml-3 text-sm font-bold text-gray-700 dark:text-gray-300 capitalize">{view}</span>
+            <div className="ml-3 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full te-led te-led-on" />
+              <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-foreground">{view}</span>
+            </div>
+            <span className="ml-auto te-module-label">NS-01</span>
           </div>
 
           <div className="flex-1 relative overflow-hidden">
@@ -254,6 +272,7 @@ export default function Home() {
             </AnimatePresence>
           </div>
         </main>
+        </div>
       </div>
 
       <TaskEditorModal

@@ -34,40 +34,31 @@ export function NotificationBanner() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ type: 'spring', damping: 24, stiffness: 260 }}
-          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-[min(26rem,calc(100vw-2rem))] rounded-xl te-surface px-4 py-3 shadow-2xl relative"
         >
-          <div className="flex items-start gap-3">
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400">
+          <div className="absolute top-2 left-2 te-screw" />
+          <div className="absolute top-2 right-2 te-screw" />
+          <div className="flex items-start gap-3 relative z-10">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg te-inset text-primary">
               <Bell size={16} />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">Enable notifications</p>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-zinc-400">
-                Get reminders for tasks and important notes — right in your browser.
+              <p className="text-[11px] font-mono font-bold tracking-widest uppercase text-foreground">Enable Alerts</p>
+              <p className="mt-1 text-[10px] font-mono text-muted-foreground leading-relaxed">
+                Get reminders for tasks and notes — delivered to your browser.
               </p>
-              <div className="mt-2.5 flex items-center gap-2">
-                <button
-                  onClick={handleEnable}
-                  disabled={requesting}
-                  className="flex items-center gap-1.5 rounded-lg bg-gray-950 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950"
-                >
-                  <Bell size={12} />
-                  {requesting ? 'Requesting…' : 'Enable'}
+              <div className="mt-3 flex items-center gap-2">
+                <button onClick={handleEnable} disabled={requesting} className="flex items-center gap-1.5 te-button-primary px-3 py-1.5 text-[9px] font-mono font-bold tracking-widest uppercase rounded disabled:opacity-50">
+                  <Bell size={11} />
+                  {requesting ? 'REQUESTING...' : 'ENABLE'}
                 </button>
-                <button
-                  onClick={dismiss}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                >
-                  <BellOff size={12} />
-                  Not now
+                <button onClick={dismiss} className="flex items-center gap-1.5 te-button px-3 py-1.5 text-[9px] font-mono font-bold tracking-widest uppercase text-muted-foreground rounded">
+                  <BellOff size={11} />
+                  DISMISS
                 </button>
               </div>
             </div>
-            <button
-              onClick={dismiss}
-              className="flex-shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-800"
-              aria-label="Dismiss"
-            >
+            <button onClick={dismiss} className="flex-shrink-0 rounded te-button p-1 text-muted-foreground" aria-label="Dismiss">
               <X size={14} />
             </button>
           </div>

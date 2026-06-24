@@ -3,21 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, ArrowRight, Sparkles, BookOpen, CheckSquare, CalendarDays, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Radio, BookOpen, CheckSquare, CalendarDays, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/components/auth-provider';
 
 const FEATURES = [
-  { icon: BookOpen, label: 'Beautiful notes' },
-  { icon: CheckSquare, label: 'Smart tasks' },
-  { icon: CalendarDays, label: 'Visual calendar' },
-  { icon: Sparkles, label: 'AI summaries' },
+  { icon: BookOpen, label: 'NOTES' },
+  { icon: CheckSquare, label: 'TASKS' },
+  { icon: CalendarDays, label: 'CALENDAR' },
+  { icon: Radio, label: 'ANALYZE' },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
   const { signInWithGoogle, signInWithGitHub } = useAuth();
-  // TODO: Implement social login buttons
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,252 +38,171 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === 'login') {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (signInError) {
-          setError(signInError.message);
-          return;
-        }
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) { setError(signInError.message); return; }
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              name: name,
-            },
-          },
+          options: { data: { name } },
         });
-        if (signUpError) {
-          setError(signUpError.message);
-          return;
-        }
-        // If email confirmation is enabled, we notify the user.
+        if (signUpError) { setError(signUpError.message); return; }
         if (data.user && !data.session) {
           setSuccess(true);
           setError('Check your email to confirm registration.');
           return;
         }
       }
-
       setSuccess(true);
       setTimeout(() => router.push('/'), 600);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'An authentication error occurred.';
-      setError(message);
+      setError(err instanceof Error ? err.message : 'An authentication error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-zinc-950 text-zinc-50 flex items-center justify-center p-4 antialiased selection:bg-zinc-800">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 te-chassis te-grid-bg te-noise">
+      <div className="relative z-10 w-full max-w-md">
+        {/* Hardware device frame */}
+        <div className="te-bezel rounded-2xl overflow-hidden shadow-2xl relative">
+          <div className="absolute top-3 left-3 te-screw z-10" />
+          <div className="absolute top-3 right-3 te-screw z-10" />
+          <div className="absolute bottom-3 left-3 te-screw z-10" />
+          <div className="absolute bottom-3 right-3 te-screw z-10" />
 
-      {/* Precision Flat Technical Grid Background */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.015] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)]"
-        style={{
-          backgroundImage: 'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-          backgroundSize: '24px 24px'
-        }}
-      />
-
-      <div className="relative z-10 w-full max-w-sm flex flex-col gap-6">
-
-        {/* Header Block */}
-        <div className="flex flex-col items-center text-center">
-          <div className="w-9 h-9 rounded-md border border-zinc-800 bg-zinc-900 flex items-center justify-center mb-3">
-            <Sparkles size={16} className="text-zinc-400" />
-          </div>
-          <h1 className="text-xl font-medium text-zinc-100 tracking-tight">Notescape</h1>
-          <p className="text-xs text-zinc-500 mt-1">Enter your details to access your workspace</p>
-        </div>
-
-        {/* Feature Tags - Minimalist Pill Indicators */}
-        <div className="flex flex-wrap justify-center gap-1.5">
-          {FEATURES.map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900/50 border border-zinc-900 text-zinc-400"
-            >
-              <Icon size={12} className="text-zinc-500" />
-              <span className="text-[11px] font-medium tracking-wide">{label}</span>
+          {/* LCD header strip */}
+          <div className="te-inset px-6 py-4 border-b border-border flex items-center justify-between">
+            <div>
+              <p className="te-module-label mb-1">NOTESCAPE SYSTEMS</p>
+              <h1 className="font-mono text-sm font-bold tracking-[0.25em] uppercase te-emboss">NS-01</h1>
             </div>
-          ))}
-        </div>
+            <div className="te-lcd rounded px-3 py-1.5 text-[10px] font-bold tracking-widest">
+              {mode === 'login' ? 'AUTH' : 'REG'}
+            </div>
+          </div>
 
-        {/* Form Enclosure Container */}
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 backdrop-blur-sm">
+          <div className="bg-background p-6 sm:p-8">
+            {/* Feature module indicators */}
+            <div className="flex justify-center gap-2 mb-6">
+              {FEATURES.map(({ icon: Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1 te-inset rounded-lg px-3 py-2 min-w-[64px]">
+                  <Icon size={14} className="text-primary" />
+                  <span className="text-[8px] font-mono font-bold tracking-widest text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
 
-          {/* Flat Segmented Tab Controls */}
-          <div className="grid grid-cols-2 p-1 bg-zinc-950 border border-zinc-900 rounded-md mb-5 relative">
-            {(['login', 'signup'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => { setMode(tab); setError(''); }}
-                className={`z-10 py-1.5 text-xs font-medium transition-colors rounded-sm relative ${mode === tab ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+            {/* Mode rocker switch */}
+            <div className="flex te-inset rounded-lg p-1 mb-6 font-mono">
+              {(['login', 'signup'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => { setMode(tab); setError(''); }}
+                  className={`flex-1 py-2 text-[10px] font-bold tracking-widest uppercase rounded-md transition-all ${
+                    mode === tab ? 'te-surface text-primary' : 'text-muted-foreground hover:text-foreground'
                   }`}
-              >
-                {tab === 'login' ? 'Sign In' : 'Create Account'}
-                {mode === tab && (
-                  <motion.div
-                    layoutId="flat-tab-indicator"
-                    className="absolute inset-0 bg-zinc-900 border border-zinc-800 rounded-sm -z-10"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <AnimatePresence mode="wait">
-              {mode === 'signup' && (
-                <motion.div
-                  key="name-field"
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
                 >
-                  <InputField
-                    label="Full Name"
-                    type="text"
-                    value={name}
-                    onChange={setName}
-                    placeholder="Ada Lovelace"
-                    autoComplete="name"
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <InputField
-              label="Email Address"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              placeholder="name@example.com"
-              autoComplete="email"
-            />
-
-            <div className="space-y-1.5 relative">
-              <InputField
-                label="Password"
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={setPassword}
-                placeholder="••••••••"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-[29px] text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
+                  {tab === 'login' ? 'SIGN IN' : 'REGISTER'}
+                </button>
+              ))}
             </div>
 
-            {mode === 'login' && (
-              <div className="text-right">
-                <button type="button" className="text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors">
-                  Forgot password?
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <AnimatePresence mode="wait">
+                {mode === 'signup' && (
+                  <motion.div
+                    key="name-field"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <InputField label="OPERATOR NAME" type="text" value={name} onChange={setName} placeholder="ADA LOVELACE" autoComplete="name" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <InputField label="EMAIL ADDRESS" type="email" value={email} onChange={setEmail} placeholder="name@example.com" autoComplete="email" />
+              <div className="relative">
+                <InputField label="ACCESS KEY" type={showPass ? 'text' : 'password'} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-[30px] te-button p-1 rounded text-muted-foreground">
+                  {showPass ? <EyeOff size={13} /> : <Eye size={13} />}
                 </button>
               </div>
-            )}
 
-            {/* Error Framework Panel */}
-            <AnimatePresence>
-              {error && (
-                <motion.p
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-xs text-red-400 bg-red-950/20 border border-red-900/50 rounded-md px-3 py-2"
-                >
-                  {error}
-                </motion.p>
+              {mode === 'login' && (
+                <div className="text-right">
+                  <button type="button" className="text-[10px] font-mono font-bold tracking-widest text-muted-foreground hover:text-primary uppercase transition-colors">
+                    Reset Key
+                  </button>
+                </div>
               )}
-            </AnimatePresence>
 
-            {/* Flat Solid Interactive CTA Action Button */}
-            <button
-              type="submit"
-              disabled={loading || success}
-              className="w-full h-9 rounded-md bg-zinc-50 text-zinc-950 font-medium text-xs flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 transition-all"
-            >
-              {loading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : success ? (
-                <span>Success</span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  {mode === 'login' ? 'Continue' : 'Register'}
-                  <ArrowRight size={13} />
-                </span>
-              )}
-            </button>
+              <AnimatePresence>
+                {error && (
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-[10px] font-mono font-bold uppercase te-inset text-destructive px-3 py-2 rounded-lg border-destructive/30">
+                    // {error}
+                  </motion.p>
+                )}
+              </AnimatePresence>
 
-            {/* Structural Rule Divider */}
-            <div className="flex items-center gap-3 py-1">
-              <div className="flex-1 h-[1px] bg-zinc-900" />
-              <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium">Or platform sign in</span>
-              <div className="flex-1 h-[1px] bg-zinc-900" />
+              <button
+                type="submit"
+                disabled={loading || success}
+                className="w-full py-3 te-button-primary text-[11px] font-mono font-bold tracking-widest uppercase rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : success ? (
+                  'ACCESS GRANTED'
+                ) : (
+                  <>
+                    {mode === 'login' ? 'INITIATE SESSION' : 'CREATE ACCOUNT'}
+                    <ArrowRight size={13} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-4 border-t border-border te-divider">
+              <p className="text-[9px] font-mono text-muted-foreground text-center leading-relaxed uppercase tracking-wider">
+                By proceeding you agree to Terms of Service and Privacy Policy
+              </p>
             </div>
+          </div>
 
-          </form>
-
-          {/* Institutional Privacy Terms Block */}
-          <div className="mt-5 pt-4 border-t border-zinc-900 text-center">
-            <p className="text-[10px] text-zinc-600 leading-relaxed">
-              By proceeding, you agree to our{' '}
-              <button className="text-zinc-500 hover:text-zinc-400 underline underline-offset-2">Terms of Service</button>
-              {' '}and{' '}
-              <button className="text-zinc-500 hover:text-zinc-400 underline underline-offset-2">Privacy Policy</button>.
-            </p>
+          {/* Bottom status bar */}
+          <div className="te-inset px-6 py-2 flex items-center justify-between border-t border-border">
+            <span className="te-module-label">REV 1.0</span>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full te-led te-led-on" />
+              <span className="text-[9px] font-mono font-bold text-muted-foreground tracking-widest">READY</span>
+            </div>
           </div>
         </div>
-
-        {/* Footer Identity */}
-        <p className="text-center text-[10px] text-zinc-600 tracking-wider font-mono">
-          NOTESCAPE SYSTEMS // 2026
-        </p>
       </div>
     </div>
   );
 }
 
 function InputField({
-  label,
-  type,
-  value,
-  onChange,
-  placeholder,
-  autoComplete,
+  label, type, value, onChange, placeholder, autoComplete,
 }: {
-  label: string;
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  autoComplete?: string;
+  label: string; type: string; value: string; onChange: (v: string) => void;
+  placeholder: string; autoComplete?: string;
 }) {
   return (
     <div className="space-y-1.5 w-full">
-      <label className="block text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-        {label}
-      </label>
+      <label className="te-label">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className="w-full h-9 bg-zinc-950 text-zinc-100 text-xs px-3 rounded-md border border-zinc-900 placeholder:text-zinc-700 outline-none focus:border-zinc-700 focus:ring-0 transition-colors duration-150"
+        className="w-full te-inset text-sm font-mono font-bold text-foreground px-3 py-2.5 rounded-lg border-none outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-primary uppercase"
       />
     </div>
   );

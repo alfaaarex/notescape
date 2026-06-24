@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, ArrowRight, X, RotateCw, Clock, Flag, Palette } from 'lucide-react';
+import { Zap, ArrowRight, X, RotateCw, Clock, Flag } from 'lucide-react';
 import type { TaskPriority, TaskStatus } from '@/lib/types';
 import { TASK_COLOR_OPTIONS, PRIORITY_COLORS } from '@/lib/types';
 import { parseTaskInput, recurrenceLabel } from '@/lib/regex-parser';
@@ -106,30 +106,29 @@ export function NlpTaskInput({ onParsed }: NlpTaskInputProps) {
     : '#94a3b8';
 
   return (
-    <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-gray-100 dark:border-zinc-800 bg-gradient-to-r from-violet-50/60 via-white to-indigo-50/40 dark:from-violet-950/20 dark:via-zinc-900 dark:to-indigo-950/20">
-      {/* Input row */}
+    <div className="flex-shrink-0 px-4 sm:px-6 py-3 border-b border-border bg-background te-inset rounded-none">
+      <div className="flex items-center gap-1.5 mb-2 te-label">
+        <span className="w-1.5 h-1.5 rounded-full te-led te-led-on" />
+        QUICK INPUT / NLP PARSER
+      </div>
       <div className="flex items-center gap-2">
-        {/* Icon — bolt for instant parsing */}
-        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-500 dark:bg-violet-500/15 dark:text-violet-400">
-          <Zap size={15} />
+        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg te-button text-primary">
+          <Zap size={14} />
         </div>
 
-        <div className="relative flex-1">
+        <div className="relative flex-1 te-inset rounded-lg px-3 py-2 flex items-center">
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={`Try: "${EXAMPLES[exampleIdx]}"`}
+            placeholder={`TRY: "${EXAMPLES[exampleIdx].toUpperCase()}"`}
             onClick={cycleExample}
-            className="w-full bg-transparent text-sm text-gray-700 dark:text-zinc-200 placeholder:text-gray-400 dark:placeholder:text-zinc-500 outline-none pr-8"
+            className="w-full bg-transparent text-xs font-mono font-bold uppercase text-foreground placeholder:text-muted-foreground/50 outline-none pr-8"
           />
           {input && (
-            <button
-              onClick={() => { setInput(''); setPreview(null); }}
-              className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-gray-300 hover:text-gray-500 dark:hover:text-zinc-400"
-            >
-              <X size={13} />
+            <button onClick={() => { setInput(''); setPreview(null); }} className="absolute right-2 p-1 te-button rounded text-muted-foreground">
+              <X size={12} />
             </button>
           )}
         </div>
@@ -137,14 +136,13 @@ export function NlpTaskInput({ onParsed }: NlpTaskInputProps) {
         <button
           onClick={submit}
           disabled={!input.trim()}
-          className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg te-button-primary disabled:opacity-40 disabled:cursor-not-allowed"
           aria-label="Create task"
         >
           <ArrowRight size={14} />
         </button>
       </div>
 
-      {/* Live parse preview */}
       <AnimatePresence mode="wait">
         {preview && input.trim() ? (
           <motion.div
@@ -155,77 +153,47 @@ export function NlpTaskInput({ onParsed }: NlpTaskInputProps) {
             transition={{ duration: 0.15 }}
             className="mt-2 overflow-hidden"
           >
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              {/* Color dot + title */}
-              <span
-                className="flex items-center gap-1 font-medium text-gray-700 dark:text-zinc-200 truncate max-w-[160px]"
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: colorHex }}
-                />
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono font-bold">
+              <span className="flex items-center gap-1 text-foreground truncate max-w-[160px] uppercase">
+                <span className="w-2 h-2 rounded-sm flex-shrink-0 border border-black/20" style={{ backgroundColor: colorHex }} />
                 {preview.title || '…'}
               </span>
 
-              {/* Priority badge */}
               {preview.priority !== 'none' && (
-                <span
-                  className="px-1.5 py-0.5 rounded-full text-white font-semibold uppercase tracking-wider"
-                  style={priorityStyle(preview.priority)}
-                >
-                  <Flag size={9} className="inline mr-0.5 -mt-px" />
+                <span className="px-1.5 py-0.5 rounded te-inset text-white uppercase tracking-wider" style={priorityStyle(preview.priority)}>
+                  <Flag size={9} className="inline mr-0.5" />
                   {preview.priority}
                 </span>
               )}
 
-              {/* Recurrence badge */}
               {preview.recurrence && (
-                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 font-medium">
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded te-inset text-primary uppercase">
                   <RotateCw size={9} />
                   {recurrenceLabel(preview.recurrence)}
                 </span>
               )}
 
-              {/* Time */}
               {preview.dueTime && (
-                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 font-medium">
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded te-inset text-muted-foreground uppercase">
                   <Clock size={9} />
                   {format24to12(preview.dueTime)}
                 </span>
               )}
 
-              {/* Duration */}
               {!!preview.duration && preview.duration > 0 && (
-                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium">
+                <span className="px-1.5 py-0.5 rounded te-inset text-muted-foreground uppercase">
                   {formatDuration(preview.duration)}
                 </span>
               )}
 
-              {/* Mode chip */}
-              <span className="px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-medium capitalize">
-                {preview.mode}
-              </span>
+              <span className="px-1.5 py-0.5 rounded te-inset text-muted-foreground uppercase">{preview.mode}</span>
 
-              {/* Color label */}
-              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-medium">
-                <Palette size={9} />
-                {preview.colorTag}
-              </span>
-
-              {/* Enter hint */}
-              <span className="ml-auto text-gray-300 dark:text-zinc-600 hidden sm:inline">
-                ↵ to create
-              </span>
+              <span className="ml-auto text-muted-foreground/60 hidden sm:inline uppercase tracking-widest">↵ EXECUTE</span>
             </div>
           </motion.div>
         ) : (
-          <motion.p
-            key="hint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500"
-          >
-            Instant parsing — type a task with time, recurrence, and priority. No AI needed.
+          <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-1.5 text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
+            // Instant parsing — time, recurrence, priority. No AI required.
           </motion.p>
         )}
       </AnimatePresence>

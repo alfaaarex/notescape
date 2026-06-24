@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FileText, CheckSquare, ArrowRight } from 'lucide-react';
+import { Search, FileText, CheckSquare, ArrowRight, CornerDownLeft, Command, Plus } from 'lucide-react';
 import type { Note } from '@/lib/storage';
 import type { Task } from '@/lib/types';
 
@@ -62,8 +62,8 @@ export function CommandPalette({
           .map((task): ResultItem => ({ kind: 'task', task })),
       ]
     : [
-        { kind: 'action', label: 'New Note', action: () => { onCreateNote(); onClose(); } },
-        { kind: 'action', label: 'New Task', action: () => { onCreateTask(); onClose(); } },
+        { kind: 'action', label: 'NEW NOTE', action: () => { onCreateNote(); onClose(); } },
+        { kind: 'action', label: 'NEW TASK', action: () => { onCreateTask(); onClose(); } },
         ...notes.slice(0, 5).map((note): ResultItem => ({ kind: 'note', note })),
       ];
 
@@ -92,85 +92,96 @@ export function CommandPalette({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm te-noise"
             onClick={onClose}
           />
           <motion.div
             key="cp-modal"
-            initial={{ opacity: 0, scale: 0.96, y: -20 }}
+            initial={{ opacity: 0, scale: 0.98, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -20 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border border-gray-200 dark:border-zinc-700"
+            className="fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg overflow-hidden rounded-xl te-surface shadow-2xl"
           >
             {/* Search input */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 dark:border-zinc-800">
-              <Search size={18} className="text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
+              <div className="te-inset p-1.5 rounded-md text-primary">
+                <Command size={14} />
+              </div>
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
                 onKeyDown={handleKeyDown}
-                placeholder="Search notes, tasks, or type a command..."
-                className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder:text-gray-400 border-none outline-none"
+                placeholder="TYPE A COMMAND OR SEARCH..."
+                className="flex-1 bg-transparent text-sm font-mono font-bold uppercase text-foreground placeholder:text-muted-foreground/50 border-none outline-none"
               />
-              <kbd className="hidden sm:block px-1.5 py-0.5 text-[10px] font-mono text-gray-400 bg-gray-100 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700">
+              <kbd className="hidden sm:flex px-2 py-1 text-[10px] font-mono font-bold tracking-widest text-muted-foreground te-button rounded">
                 ESC
               </kbd>
             </div>
 
             {/* Results */}
-            <div className="max-h-72 overflow-y-auto py-2">
+            <div className="max-h-72 overflow-y-auto py-2 px-2">
               {results.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-8">No results found</p>
+                <div className="flex flex-col items-center justify-center py-10 opacity-50">
+                  <Search size={24} className="mb-2 text-muted-foreground" />
+                  <p className="text-center text-[10px] font-mono font-bold tracking-widest uppercase text-muted-foreground">NO MATCHES FOUND</p>
+                </div>
               ) : (
-                results.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => handleSelect(item)}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                      activeIndex === idx
-                        ? 'bg-gray-100 dark:bg-zinc-800'
-                        : 'hover:bg-gray-50 dark:hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    {item.kind === 'note' ? (
-                      <>
-                        <FileText size={15} className="text-gray-400 flex-shrink-0" />
-                        <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">
-                          {item.note.title || 'Untitled'}
-                        </span>
-                        <ArrowRight size={13} className="text-gray-300 flex-shrink-0" />
-                      </>
-                    ) : item.kind === 'task' ? (
-                      <>
-                        <CheckSquare size={15} className="text-gray-400 flex-shrink-0" />
-                        <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">
-                          {item.task.title}
-                        </span>
-                        <ArrowRight size={13} className="text-gray-300 flex-shrink-0" />
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-5 h-5 flex items-center justify-center rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[10px] font-bold">
-                          +
-                        </span>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {item.label}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                ))
+                results.map((item, idx) => {
+                  const active = activeIndex === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      onClick={() => handleSelect(item)}
+                      className={`group flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                        active ? 'te-inset bg-background' : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      {item.kind === 'note' ? (
+                        <>
+                          <div className={`p-1.5 rounded-md ${active ? 'bg-primary text-primary-foreground' : 'te-button text-muted-foreground'}`}>
+                            <FileText size={13} />
+                          </div>
+                          <span className={`flex-1 text-xs font-bold font-mono tracking-wide truncate ${active ? 'text-primary' : 'text-foreground'}`}>
+                            {item.note.title.toUpperCase() || 'UNTITLED'}
+                          </span>
+                          {active && <CornerDownLeft size={12} className="text-primary flex-shrink-0" />}
+                        </>
+                      ) : item.kind === 'task' ? (
+                        <>
+                          <div className={`p-1.5 rounded-md ${active ? 'bg-primary text-primary-foreground' : 'te-button text-muted-foreground'}`}>
+                            <CheckSquare size={13} />
+                          </div>
+                          <span className={`flex-1 text-xs font-bold font-mono tracking-wide truncate ${active ? 'text-primary' : 'text-foreground'}`}>
+                            {item.task.title.toUpperCase()}
+                          </span>
+                          {active && <CornerDownLeft size={12} className="text-primary flex-shrink-0" />}
+                        </>
+                      ) : (
+                        <>
+                          <div className={`p-1.5 rounded-md ${active ? 'bg-primary text-primary-foreground' : 'te-inset bg-background text-muted-foreground'}`}>
+                            <Plus size={13} />
+                          </div>
+                          <span className={`flex-1 text-xs font-bold font-mono tracking-wide ${active ? 'text-primary' : 'text-foreground'}`}>
+                            {item.label}
+                          </span>
+                          {active && <CornerDownLeft size={12} className="text-primary flex-shrink-0" />}
+                        </>
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
 
-            <div className="flex items-center gap-4 px-4 py-2.5 border-t border-gray-100 dark:border-zinc-800 text-[11px] text-gray-400">
-              <span><kbd className="font-mono">↑↓</kbd> navigate</span>
-              <span><kbd className="font-mono">↵</kbd> select</span>
-              <span><kbd className="font-mono">esc</kbd> close</span>
+            {/* Footer */}
+            <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-muted/30 text-[9px] font-mono font-bold tracking-widest text-muted-foreground uppercase">
+              <span className="flex items-center gap-1.5"><kbd className="te-button px-1 rounded">↑↓</kbd> NAVIGATE</span>
+              <span className="flex items-center gap-1.5"><kbd className="te-button px-1 rounded">↵</kbd> EXECUTE</span>
             </div>
           </motion.div>
         </>

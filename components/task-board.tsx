@@ -41,10 +41,10 @@ const STATUS_COLUMNS: Array<{
   icon: React.ReactNode;
   color: string;
 }> = [
-  { id: 'todo',        label: 'Todo',        icon: <Circle size={14} />,       color: '#9ca3af' },
-  { id: 'in_progress', label: 'In Progress', icon: <Clock size={14} />,        color: '#fb923c' },
-  { id: 'done',        label: 'Done',        icon: <CheckCircle2 size={14} />, color: '#4ade80' },
-  { id: 'cancelled',   label: 'Cancelled',   icon: <XCircle size={14} />,      color: '#f87171' },
+  { id: 'todo',        label: 'TODO',        icon: <Circle size={14} />,       color: '#9ca3af' },
+  { id: 'in_progress', label: 'IN PROGRESS', icon: <Clock size={14} />,        color: '#fb923c' },
+  { id: 'done',        label: 'DONE',        icon: <CheckCircle2 size={14} />, color: '#4ade80' },
+  { id: 'cancelled',   label: 'CANCELLED',   icon: <XCircle size={14} />,      color: '#f87171' },
 ];
 
 const container = {
@@ -59,7 +59,7 @@ const item = {
 function PriorityDot({ priority }: { priority: TaskPriority }) {
   return (
     <span
-      className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+      className="inline-block w-2 h-2 rounded-full flex-shrink-0 border border-black/20 dark:border-white/20"
       style={{ backgroundColor: PRIORITY_COLORS[priority] }}
       title={`Priority: ${PRIORITY_LABELS[priority]}`}
     />
@@ -70,7 +70,7 @@ function ColorDot({ colorTag }: { colorTag: string }) {
   const found = TASK_COLOR_OPTIONS.find((c) => c.value === colorTag);
   return (
     <span
-      className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+      className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0 border border-black/20 dark:border-white/20 shadow-inner"
       style={{ backgroundColor: found?.hex ?? '#7dd3fc' }}
     />
   );
@@ -85,17 +85,17 @@ function DueDateBadge({ dueDate }: { dueDate: string | null }) {
   const isToday = date.getTime() === today.getTime();
   return (
     <span
-      className={`flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md ${
+      className={`flex items-center gap-1 text-[9px] font-mono font-bold tracking-widest px-1.5 py-0.5 rounded uppercase border border-border ${
         isOverdue
-          ? 'text-red-600 bg-red-50 dark:bg-red-900/20'
+          ? 'text-destructive bg-destructive/10'
           : isToday
-          ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20'
-          : 'text-gray-500 bg-gray-100 dark:bg-zinc-800'
+          ? 'text-primary bg-primary/10'
+          : 'text-muted-foreground te-inset'
       }`}
     >
-      <Calendar size={10} />
+      <Calendar size={9} />
       {isToday
-        ? 'Today'
+        ? 'TODAY'
         : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
     </span>
   );
@@ -119,84 +119,84 @@ function TaskCard({
     <motion.div
       layout
       variants={item}
-      className="group relative bg-white dark:bg-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-700 p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
-      style={{ borderLeft: `3px solid ${colorHex}` }}
+      className="group relative te-surface rounded-lg p-3 sm:p-4 shadow-sm hover:te-glow transition-all duration-200 cursor-pointer border-l-4"
+      style={{ borderLeftColor: colorHex }}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-3">
         {/* Status toggle */}
         <button
-          onClick={onCycleStatus}
-          className="mt-0.5 flex-shrink-0 text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          onClick={(e) => { e.stopPropagation(); onCycleStatus(); }}
+          className="mt-0.5 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
         >
           {task.status === 'done' ? (
-            <CheckCircle2 size={18} className="text-emerald-500" />
+            <CheckCircle2 size={16} className="text-primary" />
           ) : task.status === 'in_progress' ? (
-            <Clock size={18} className="text-amber-400" />
+            <Clock size={16} className="text-amber-500" />
           ) : task.status === 'cancelled' ? (
-            <XCircle size={18} className="text-red-400" />
+            <XCircle size={16} className="text-destructive" />
           ) : (
-            <Circle size={18} />
+            <Circle size={16} />
           )}
         </button>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" onClick={onEdit}>
           <p
-            className={`text-sm font-medium leading-snug ${
+            className={`text-sm font-bold font-sans uppercase tracking-wide leading-snug ${
               task.status === 'done' || task.status === 'cancelled'
-                ? 'line-through text-gray-400 dark:text-zinc-500'
-                : 'text-gray-800 dark:text-gray-200'
+                ? 'line-through text-muted-foreground opacity-70'
+                : 'text-foreground'
             }`}
           >
             {task.title}
           </p>
           {task.description && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+            <p className="mt-1 text-[11px] font-mono text-muted-foreground line-clamp-2 leading-relaxed">
               {task.description}
             </p>
           )}
-          <div className="flex items-center flex-wrap gap-2 mt-2">
-            <PriorityDot priority={task.priority} />
-            {task.priority !== 'none' && (
-              <span className="text-[11px] font-medium" style={{ color: PRIORITY_COLORS[task.priority] }}>
-                {PRIORITY_LABELS[task.priority]}
-              </span>
-            )}
+          <div className="flex items-center flex-wrap gap-2 mt-3">
+            <div className="flex items-center gap-1">
+              <PriorityDot priority={task.priority} />
+              {task.priority !== 'none' && (
+                <span className="text-[9px] font-mono font-bold uppercase tracking-widest" style={{ color: PRIORITY_COLORS[task.priority] }}>
+                  {PRIORITY_LABELS[task.priority]}
+                </span>
+              )}
+            </div>
             <DueDateBadge dueDate={task.dueDate} />
           </div>
         </div>
 
-        {/* Context menu — always visible on touch devices */}
+        {/* Context menu */}
         <div className="relative flex-shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-            className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all
-                       opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            className="p-1 rounded te-button text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <MoreHorizontal size={14} />
           </button>
           <AnimatePresence>
             {menuOpen && (
               <>
-                {/* Backdrop to close */}
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9, y: -5 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: -5 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-7 z-20 w-36 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-gray-100 dark:border-zinc-700 py-1 overflow-hidden"
+                  className="absolute right-0 top-7 z-20 w-32 te-surface rounded-lg shadow-xl overflow-hidden"
                 >
                   <button
-                    onClick={() => { onEdit(); setMenuOpen(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-700"
+                    onClick={(e) => { e.stopPropagation(); onEdit(); setMenuOpen(false); }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-[10px] font-bold font-mono tracking-widest uppercase text-foreground hover:bg-muted"
                   >
-                    <Edit3 size={13} /> Edit
+                    <Edit3 size={11} /> EDIT
                   </button>
                   <button
-                    onClick={() => { onDelete(); setMenuOpen(false); }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    onClick={(e) => { e.stopPropagation(); onDelete(); setMenuOpen(false); }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-[10px] font-bold font-mono tracking-widest uppercase text-destructive hover:bg-destructive/10"
                   >
-                    <Trash2 size={13} /> Delete
+                    <Trash2 size={11} /> DELETE
                   </button>
                 </motion.div>
               </>
@@ -232,34 +232,35 @@ export function TaskBoard({
   const isEmpty = tasks.length === 0;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-
+    <div className="flex flex-col h-full overflow-hidden te-noise bg-background">
       {/* ── Toolbar ────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex flex-col gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-zinc-800">
-
-        {/* Top row: title + new task */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Tasks</h1>
-            <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-xs font-semibold text-gray-500 dark:text-gray-400">
-              {tasks.length}
-            </span>
+      <div className="flex-shrink-0 flex flex-col gap-4 px-4 sm:px-6 py-4 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2 te-label mb-1">
+              <span className="w-2 h-2 rounded-full te-led te-led-on" />
+              TASK MANAGER / MODULE 2
+            </div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold font-sans tracking-tight uppercase te-emboss">Tasks</h1>
+              <div className="bg-primary text-primary-foreground font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+                {tasks.length}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* View Toggle */}
-            <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
+          <div className="flex items-center gap-3">
+            {/* View Toggle - Physical Rocker */}
+            <div className="flex items-center te-inset rounded-lg p-0.5 font-mono">
               <button
                 onClick={() => setView('board')}
-                className={`p-1.5 rounded-md transition-all ${view === 'board' ? 'bg-white dark:bg-zinc-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                aria-label="Board view"
+                className={`flex items-center justify-center p-1.5 w-8 rounded-md transition-all ${view === 'board' ? 'te-surface text-primary' : 'text-muted-foreground'}`}
               >
                 <LayoutGrid size={14} />
               </button>
               <button
                 onClick={() => setView('list')}
-                className={`p-1.5 rounded-md transition-all ${view === 'list' ? 'bg-white dark:bg-zinc-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                aria-label="List view"
+                className={`flex items-center justify-center p-1.5 w-8 rounded-md transition-all ${view === 'list' ? 'te-surface text-primary' : 'text-muted-foreground'}`}
               >
                 <List size={14} />
               </button>
@@ -267,29 +268,28 @@ export function TaskBoard({
 
             <button
               onClick={onNewTask}
-              className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs sm:text-sm font-semibold rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1.5 te-button-primary text-[10px] font-bold font-mono tracking-widest rounded shadow-sm"
             >
               <Plus size={14} />
-              <span className="hidden xs:inline sm:inline">New Task</span>
-              <span className="xs:hidden sm:hidden">New</span>
+              <span className="hidden sm:inline">NEW TASK</span>
             </button>
           </div>
         </div>
 
-        {/* Bottom row: priority filters (scrollable on mobile) */}
-        <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-1 overflow-x-auto scrollbar-none">
+        {/* Filters */}
+        <div className="flex items-center gap-1.5 te-inset rounded-lg p-1 overflow-x-auto scrollbar-none w-fit">
+          <span className="text-[9px] font-mono font-bold tracking-widest text-muted-foreground ml-2 mr-1 uppercase">PRIORITY:</span>
           {(['all', 'high', 'medium', 'low'] as const).map((p) => (
             <button
               key={p}
               onClick={() => setFilterPriority(p)}
-              className={`flex-shrink-0 px-3 py-1 text-xs font-medium rounded-md transition-all ${
+              className={`flex-shrink-0 px-2.5 py-1 text-[9px] font-bold font-mono uppercase tracking-widest rounded transition-all ${
                 filterPriority === p
-                  ? 'bg-white dark:bg-zinc-700 text-gray-800 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'te-surface text-foreground shadow-sm border border-border'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
-              style={filterPriority === p && p !== 'all' ? { color: PRIORITY_COLORS[p] } : {}}
             >
-              {p === 'all' ? 'All' : PRIORITY_LABELS[p]}
+              {p === 'all' ? 'ALL' : PRIORITY_LABELS[p]}
             </button>
           ))}
         </div>
@@ -299,50 +299,43 @@ export function TaskBoard({
       <NlpTaskInput onParsed={onNlpTask} />
 
       {isEmpty ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 py-16">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
-            <CheckCircle2 size={26} className="text-gray-300 dark:text-zinc-600" />
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center px-6 py-16">
+          <div className="w-16 h-16 rounded-2xl te-inset flex items-center justify-center shadow-inner border border-border">
+            <CheckCircle2 size={24} className="text-muted-foreground opacity-50" />
           </div>
           <div>
-            <p className="font-semibold text-gray-700 dark:text-gray-300">No tasks yet</p>
-            <p className="text-sm text-gray-400 mt-1">Create your first task to get started</p>
+            <p className="font-bold font-sans text-xl uppercase te-emboss">No Active Tasks</p>
+            <p className="text-[10px] font-mono text-muted-foreground mt-2 uppercase tracking-widest">// INITIALIZE NEW TASK SEQUENCE TO BEGIN</p>
           </div>
           <button
             onClick={onNewTask}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-xl hover:opacity-90 transition-all"
+            className="flex items-center gap-2 px-4 py-2 te-button-primary text-[10px] font-bold font-mono uppercase tracking-widest mt-2"
           >
-            <Plus size={15} /> New Task
+            <Plus size={14} /> CREATE TASK
           </button>
         </div>
       ) : view === 'board' ? (
-
         /* ── Board View ──────────────────────────────────────────────── */
-        <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 sm:p-5">
-          {/* On mobile: stack columns vertically; on sm+: horizontal scroll row */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:h-full sm:min-w-max">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:h-full sm:min-w-max">
             {STATUS_COLUMNS.map((col) => {
               const colTasks = filtered.filter((t) => t.status === col.id);
               return (
-                <div key={col.id} className="w-full sm:w-64 md:w-72 flex flex-col gap-2">
+                <div key={col.id} className="w-full sm:w-72 md:w-80 flex flex-col gap-3 rounded-xl te-inset p-3 border border-border bg-black/5 dark:bg-white/5">
                   {/* Column header */}
-                  <div className="flex items-center gap-2 px-1 py-1">
-                    <span style={{ color: col.color }}>{col.icon}</span>
-                    <span className="text-xs font-bold tracking-wider uppercase text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2 px-2 py-1 bg-background/50 rounded shadow-sm border border-border/50">
+                    <span className="w-2 h-2 rounded-full border border-black/20 dark:border-white/20" style={{ backgroundColor: col.color }} />
+                    <span className="text-[10px] font-bold font-mono tracking-widest uppercase text-foreground">
                       {col.label}
                     </span>
-                    <span className="ml-auto text-xs text-gray-400 dark:text-gray-500 font-medium">
+                    <span className="ml-auto flex items-center justify-center w-5 h-5 rounded te-inset text-[10px] font-mono font-bold text-muted-foreground bg-background border border-border/50">
                       {colTasks.length}
                     </span>
                   </div>
 
                   {/* Cards */}
-                  <div className="sm:flex-1 sm:overflow-y-auto pb-2 sm:pb-4 sm:pr-1">
-                    <motion.div
-                      variants={container}
-                      initial="hidden"
-                      animate="show"
-                      className="flex flex-col gap-2"
-                    >
+                  <div className="sm:flex-1 sm:overflow-y-auto pb-2 pr-1">
+                    <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-3">
                       {colTasks.map((task) => (
                         <TaskCard
                           key={task.id}
@@ -353,8 +346,8 @@ export function TaskBoard({
                         />
                       ))}
                       {colTasks.length === 0 && (
-                        <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-zinc-700 p-4 text-center text-xs text-gray-400">
-                          No tasks
+                        <div className="rounded-lg border border-dashed border-muted-foreground/30 p-6 flex items-center justify-center text-[9px] font-mono font-bold uppercase tracking-widest text-muted-foreground/60">
+                          // EMPTY SLOT
                         </div>
                       )}
                     </motion.div>
@@ -364,23 +357,21 @@ export function TaskBoard({
             })}
           </div>
         </div>
-
       ) : (
-
         /* ── List View ───────────────────────────────────────────────── */
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <motion.div
             variants={container}
             initial="hidden"
             animate="show"
-            className="flex flex-col divide-y divide-gray-100 dark:divide-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900"
+            className="flex flex-col rounded-xl te-surface overflow-hidden border border-border divide-y divide-border"
           >
-            {/* Desktop header row — hidden on mobile */}
-            <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-gray-50 dark:bg-zinc-800 text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
-              <span>Title</span>
-              <span>Priority</span>
-              <span>Status</span>
-              <span>Due</span>
+            {/* Desktop header row */}
+            <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-muted/50 text-[10px] font-bold font-mono text-muted-foreground uppercase tracking-widest">
+              <span>TASK TITLE</span>
+              <span>PRIORITY</span>
+              <span>STATUS</span>
+              <span>DUE DATE</span>
               <span />
             </div>
 
@@ -388,105 +379,71 @@ export function TaskBoard({
               <motion.div
                 key={task.id}
                 variants={item}
-                className="group px-3 sm:px-4 py-3 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                className="group px-4 sm:px-5 py-4 hover:bg-muted/30 transition-colors"
               >
-                {/* Mobile layout: stacked */}
-                <div className="flex items-start gap-2.5 sm:hidden">
+                {/* Mobile layout */}
+                <div className="flex items-start gap-3 sm:hidden">
                   <ColorDot colorTag={task.colorTag} />
-                  <button
-                    onClick={() => onUpdateStatus(task.id, getNextStatus(task.status))}
-                    className="flex-shrink-0 mt-0.5"
-                  >
+                  <button onClick={() => onUpdateStatus(task.id, getNextStatus(task.status))} className="flex-shrink-0 mt-0.5">
                     {task.status === 'done' ? (
-                      <CheckCircle2 size={16} className="text-emerald-500" />
+                      <CheckCircle2 size={16} className="text-primary" />
                     ) : task.status === 'in_progress' ? (
-                      <Clock size={16} className="text-amber-400" />
+                      <Clock size={16} className="text-amber-500" />
                     ) : task.status === 'cancelled' ? (
-                      <XCircle size={16} className="text-red-400" />
+                      <XCircle size={16} className="text-destructive" />
                     ) : (
-                      <Circle size={16} className="text-gray-300" />
+                      <Circle size={16} className="text-muted-foreground" />
                     )}
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={`text-sm font-medium ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}
-                    >
+                  <div className="flex-1 min-w-0" onClick={() => onEditTask(task)}>
+                    <span className={`text-xs font-bold font-sans uppercase tracking-wide ${task.status === 'done' ? 'line-through text-muted-foreground opacity-60' : 'text-foreground'}`}>
                       {task.title}
                     </span>
-                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
                       <PriorityDot priority={task.priority} />
-                      {task.priority !== 'none' && (
-                        <span className="text-[11px]" style={{ color: PRIORITY_COLORS[task.priority] }}>
-                          {PRIORITY_LABELS[task.priority]}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-gray-400 dark:text-zinc-500">
-                        {STATUS_LABELS[task.status]}
-                      </span>
+                      <span className="text-[9px] font-mono font-bold tracking-widest uppercase text-muted-foreground">{STATUS_LABELS[task.status]}</span>
                       <DueDateBadge dueDate={task.dueDate} />
                     </div>
                   </div>
-                  {/* Always-visible actions on mobile */}
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <button
-                      onClick={() => onEditTask(task)}
-                      className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
-                      aria-label="Edit"
-                    >
-                      <Edit3 size={13} />
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => onEditTask(task)} className="p-1.5 rounded te-button text-muted-foreground">
+                      <Edit3 size={12} />
                     </button>
-                    <button
-                      onClick={() => onDeleteTask(task.id)}
-                      className="p-1.5 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-500"
-                      aria-label="Delete"
-                    >
-                      <Trash2 size={13} />
+                    <button onClick={() => onDeleteTask(task.id)} className="p-1.5 rounded te-button-destructive text-white">
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
 
-                {/* Desktop layout: grid row */}
+                {/* Desktop layout */}
                 <div className="hidden sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
                     <ColorDot colorTag={task.colorTag} />
-                    <button
-                      onClick={() => onUpdateStatus(task.id, getNextStatus(task.status))}
-                      className="flex-shrink-0"
-                    >
-                      {task.status === 'done' ? (
-                        <CheckCircle2 size={15} className="text-emerald-500" />
-                      ) : (
-                        <Circle size={15} className="text-gray-300" />
-                      )}
+                    <button onClick={() => onUpdateStatus(task.id, getNextStatus(task.status))} className="flex-shrink-0">
+                      {task.status === 'done' ? <CheckCircle2 size={14} className="text-primary" /> : <Circle size={14} className="text-muted-foreground" />}
                     </button>
-                    <span
-                      className={`text-sm font-medium truncate ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}
-                    >
+                    <span className={`text-xs font-bold font-sans uppercase tracking-wide truncate ${task.status === 'done' ? 'line-through text-muted-foreground opacity-60' : 'text-foreground'}`}>
                       {task.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <PriorityDot priority={task.priority} />
-                    <span className="text-xs" style={{ color: PRIORITY_COLORS[task.priority] }}>
+                    <span className="text-[9px] font-mono font-bold tracking-widest uppercase" style={{ color: PRIORITY_COLORS[task.priority] }}>
                       {PRIORITY_LABELS[task.priority]}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-[9px] font-mono font-bold tracking-widest uppercase text-muted-foreground te-inset px-2 py-0.5 rounded w-fit bg-background border-none">
                     {STATUS_LABELS[task.status]}
                   </span>
-                  <DueDateBadge dueDate={task.dueDate} />
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => onEditTask(task)}
-                      className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
-                    >
-                      <Edit3 size={13} />
+                  <div>
+                    <DueDateBadge dueDate={task.dueDate} />
+                  </div>
+                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                    <button onClick={() => onEditTask(task)} className="p-1 rounded te-button text-muted-foreground hover:text-foreground">
+                      <Edit3 size={11} />
                     </button>
-                    <button
-                      onClick={() => onDeleteTask(task.id)}
-                      className="p-1.5 rounded-md text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 size={13} />
+                    <button onClick={() => onDeleteTask(task.id)} className="p-1 rounded te-button text-muted-foreground hover:text-destructive">
+                      <Trash2 size={11} />
                     </button>
                   </div>
                 </div>

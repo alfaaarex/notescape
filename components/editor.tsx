@@ -41,6 +41,7 @@ import {
   Trash2,
   Type,
   X,
+  Radio
 } from 'lucide-react';
 import type { Note } from '@/lib/storage';
 import type { Collaborator, CollaboratorRole } from '@/lib/types';
@@ -78,11 +79,10 @@ interface DbNote {
 }
 
 const colorMap: Record<string, { label: string; hex: string; ring: string }> = {
-  alabaster: { label: 'Alabaster', hex: '#F9F9F6', ring: '#E6E4DC' },
-  sage: { label: 'Soft Sage', hex: '#EEF2EE', ring: '#CFDCCF' },
-  linen: { label: 'Warm Linen', hex: '#FDF8F5', ring: '#EAD8CE' },
-  slate: { label: 'Faint Slate', hex: '#F0F1F4', ring: '#D9DDE5' },
-  lavender: { label: 'Washed Lavender', hex: '#F3EFFF', ring: '#DCD1FF' },
+  cream: { label: 'Warm Cream', hex: 'var(--background)', ring: 'var(--border)' },
+  concrete: { label: 'Light Concrete', hex: 'var(--muted)', ring: 'var(--border)' },
+  kraft: { label: 'Kraft Paper', hex: '#E3DACC', ring: '#CBBFAA' },
+  slate: { label: 'Dark Slate', hex: '#D5D9E0', ring: '#BAC1CC' },
 };
 
 type SlashCommand = {
@@ -205,10 +205,8 @@ const getLinePrefix = (content: string, cursor: number) => {
 
 const estimateReadingTime = (wordCount: number) => Math.max(1, Math.ceil(wordCount / 220));
 
-// Render inline markdown: bold, italic, code, strikethrough, links
 const renderInline = (text: string): React.ReactNode[] => {
   const parts: React.ReactNode[] = [];
-  // Pattern order matters: code first (to avoid processing its contents), then links, then bold+italic combos
   const pattern = /(`[^`]+`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|\[([^\]]+)\]\(([^)]+)\))/g;
   let last = 0;
   let match: RegExpExecArray | null;
@@ -217,17 +215,17 @@ const renderInline = (text: string): React.ReactNode[] => {
     if (match.index > last) parts.push(<span key={`t-${idx++}`}>{text.slice(last, match.index)}</span>);
     const m = match[0];
     if (m.startsWith('`')) {
-      parts.push(<code key={`c-${idx++}`} className="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm text-rose-600 dark:bg-zinc-800 dark:text-rose-400">{m.slice(1, -1)}</code>);
+      parts.push(<code key={`c-${idx++}`} className="rounded te-inset px-1.5 py-0.5 font-mono text-[13px] text-primary">{m.slice(1, -1)}</code>);
     } else if (m.startsWith('***')) {
       parts.push(<strong key={`bi-${idx++}`} className="font-bold italic">{match[2]}</strong>);
     } else if (m.startsWith('**')) {
-      parts.push(<strong key={`b-${idx++}`} className="font-semibold text-gray-900 dark:text-zinc-100">{match[3]}</strong>);
+      parts.push(<strong key={`b-${idx++}`} className="font-semibold">{match[3]}</strong>);
     } else if (m.startsWith('*')) {
       parts.push(<em key={`i-${idx++}`} className="italic">{match[4]}</em>);
     } else if (m.startsWith('~~')) {
-      parts.push(<s key={`s-${idx++}`} className="line-through text-gray-400 dark:text-zinc-500">{match[5]}</s>);
+      parts.push(<s key={`s-${idx++}`} className="line-through text-muted-foreground">{match[5]}</s>);
     } else if (m.startsWith('[')) {
-      parts.push(<a key={`a-${idx++}`} href={match[7]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 dark:text-blue-400">{match[6]}</a>);
+      parts.push(<a key={`a-${idx++}`} href={match[7]} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary">{match[6]}</a>);
     }
     last = match.index + m.length;
   }
@@ -237,7 +235,7 @@ const renderInline = (text: string): React.ReactNode[] => {
 
 const renderPreview = (text: string) => {
   if (!text.trim()) {
-    return <p className="text-gray-400 dark:text-zinc-500">Nothing to preview yet.</p>;
+    return <p className="text-muted-foreground font-mono text-sm uppercase tracking-widest">// NO CONTENT</p>;
   }
 
   const lines = text.split('\n');
@@ -248,7 +246,6 @@ const renderPreview = (text: string) => {
     const line = lines[i];
     const key = `${i}-${line.slice(0, 20)}`;
 
-    // Fenced code blocks
     if (line.startsWith('```')) {
       const lang = line.slice(3).trim();
       const codeLines: string[] = [];
@@ -258,25 +255,25 @@ const renderPreview = (text: string) => {
         i++;
       }
       elements.push(
-        <pre key={key} className="my-4 overflow-x-auto rounded-xl bg-gray-950 px-5 py-4 text-sm leading-relaxed dark:bg-zinc-900">
-          <code className={`text-gray-100 font-mono ${lang ? `language-${lang}` : ''}`}>{codeLines.join('\n')}</code>
+        <pre key={key} className="my-6 overflow-x-auto rounded-xl te-inset bg-black/5 dark:bg-black/40 p-5 text-sm leading-relaxed border border-border">
+          <code className={`font-mono text-foreground ${lang ? `language-${lang}` : ''}`}>{codeLines.join('\n')}</code>
         </pre>
       );
       i++;
       continue;
     }
 
-    if (line.startsWith('# ')) { elements.push(<h1 key={key} className="mt-7 first:mt-0 text-3xl font-bold text-gray-950 dark:text-zinc-50">{renderInline(line.slice(2))}</h1>); }
-    else if (line.startsWith('## ')) { elements.push(<h2 key={key} className="mt-6 text-2xl font-bold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(3))}</h2>); }
-    else if (line.startsWith('### ')) { elements.push(<h3 key={key} className="mt-5 text-xl font-semibold text-gray-900 dark:text-zinc-100">{renderInline(line.slice(4))}</h3>); }
-    else if (line.startsWith('- [ ] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-1 inline-block h-4 w-4 flex-shrink-0 rounded border border-gray-300 dark:border-zinc-600" /><span>{renderInline(line.slice(6))}</span></p>); }
-    else if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-500 dark:text-zinc-500"><span className="mt-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-gray-800 dark:bg-zinc-200"><svg viewBox="0 0 10 10" className="h-2.5 w-2.5 text-white dark:text-zinc-900" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span><span className="line-through">{renderInline(line.slice(6))}</span></p>); }
-    else if (line.startsWith('- ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-2 text-gray-700 dark:text-zinc-300"><span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-zinc-500" /><span>{renderInline(line.slice(2))}</span></p>); }
-    else if (/^\d+\.\s/.test(line)) { elements.push(<p key={key} className="my-1.5 text-gray-700 dark:text-zinc-300">{renderInline(line)}</p>); }
-    else if (line.startsWith('> ')) { elements.push(<blockquote key={key} className="my-3 border-l-2 border-indigo-300 pl-4 text-gray-600 italic dark:border-indigo-700 dark:text-zinc-400">{renderInline(line.slice(2))}</blockquote>); }
-    else if (line === '---') { elements.push(<hr key={key} className="my-6 border-gray-200 dark:border-zinc-800" />); }
-    else if (!line.trim()) { elements.push(<div key={key} className="h-3" />); }
-    else { elements.push(<p key={key} className="my-2 text-gray-700 dark:text-zinc-300">{renderInline(line)}</p>); }
+    if (line.startsWith('# ')) { elements.push(<h1 key={key} className="mt-8 mb-4 text-3xl font-bold font-sans tracking-tight te-emboss">{renderInline(line.slice(2))}</h1>); }
+    else if (line.startsWith('## ')) { elements.push(<h2 key={key} className="mt-7 mb-3 text-2xl font-bold font-sans tracking-tight">{renderInline(line.slice(3))}</h2>); }
+    else if (line.startsWith('### ')) { elements.push(<h3 key={key} className="mt-6 mb-2 text-xl font-semibold font-sans">{renderInline(line.slice(4))}</h3>); }
+    else if (line.startsWith('- [ ] ')) { elements.push(<p key={key} className="my-2 flex items-start gap-3"><span className="mt-1 inline-block h-4 w-4 flex-shrink-0 rounded te-inset bg-background" /><span>{renderInline(line.slice(6))}</span></p>); }
+    else if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) { elements.push(<p key={key} className="my-2 flex items-start gap-3 text-muted-foreground"><span className="mt-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded te-surface bg-primary text-primary-foreground"><Check size={12} strokeWidth={3} /></span><span className="line-through">{renderInline(line.slice(6))}</span></p>); }
+    else if (line.startsWith('- ')) { elements.push(<p key={key} className="my-1.5 flex items-start gap-3"><span className="mt-2.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" /><span>{renderInline(line.slice(2))}</span></p>); }
+    else if (/^\d+\.\s/.test(line)) { elements.push(<p key={key} className="my-1.5">{renderInline(line)}</p>); }
+    else if (line.startsWith('> ')) { elements.push(<blockquote key={key} className="my-5 border-l-4 border-primary pl-4 text-muted-foreground italic bg-muted/30 py-2 pr-4 rounded-r-lg">{renderInline(line.slice(2))}</blockquote>); }
+    else if (line === '---') { elements.push(<div key={key} className="te-divider my-8" />); }
+    else if (!line.trim()) { elements.push(<div key={key} className="h-4" />); }
+    else { elements.push(<p key={key} className="my-3 leading-[1.8]">{renderInline(line)}</p>); }
 
     i++;
   }
@@ -296,13 +293,12 @@ export const Editor = ({
   removeCollaborator,
   updateCollaborator
 }: EditorProps) => {
-  // ── Yjs collaborative title + content ──────────────────────────
   const { title, content, setTitle, setContent, isSyncing } = useYjsNote(
     note?.id,
     note?.title ?? '',
     note?.content ?? '',
   );
-  const [color, setColor] = useState('alabaster');
+  const [color, setColor] = useState('cream');
   const [tags, setTags] = useState<string[]>([]);
   const [pinned, setPinned] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
@@ -327,36 +323,25 @@ export const Editor = ({
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [showMobileToolbar, setShowMobileToolbar] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
-  interface PresenceUser {
-    id: string;
-    email: string;
-    fullName?: string | null;
-    avatarUrl?: string | null;
-  }
 
+  interface PresenceUser { id: string; email: string; fullName?: string | null; avatarUrl?: string | null; }
   const [presentUsers, setPresentUsers] = useState<Record<string, PresenceUser>>({});
-
   const { user } = useAuth();
-
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const noteIdRef = useRef<string>(note?.id ?? crypto.randomUUID());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // Tracks the last time we sent a save so we can ignore our own realtime echo
   const lastSavedAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (note) {
-      // title + content are managed by useYjsNote; skip them here
-      setColor(colorMap[note.color] ? note.color : 'alabaster');
+      setColor(colorMap[note.color] ? note.color : 'cream');
       setTags(note.tags ?? []);
       setPinned(note.pinned ?? false);
       setIsPublic(note.isPublic ?? false);
       noteIdRef.current = note.id;
     } else {
-      // Generate a fresh ID immediately so a new note never inherits
-      // the previous note's ID (which would cause content to be copied).
       noteIdRef.current = crypto.randomUUID();
-      setColor('alabaster');
+      setColor('cream');
       setTags([]);
       setPinned(false);
       setIsPublic(false);
@@ -369,8 +354,6 @@ export const Editor = ({
     setSummaryError(null);
   }, [note]);
 
-  // Realtime subscription for the current note (non-Yjs fields only: color, pinned, isPublic)
-  // Dependency array is ONLY note?.id — we don't want to re-subscribe on every keystroke.
   const colorRef = useRef(color);
   const isPublicRef = useRef(isPublic);
   const pinnedRef = useRef(pinned);
@@ -378,105 +361,55 @@ export const Editor = ({
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
   useEffect(() => { pinnedRef.current = pinned; }, [pinned]);
-  useEffect(() => { colorRef.current = color; }, [color]);
-  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
-  useEffect(() => { pinnedRef.current = pinned; }, [pinned]);
 
   useEffect(() => {
     if (!note?.id) return;
-
     const channel = supabase
       .channel(`note_changes_${note.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}` },
-        (payload) => {
-          const newData = payload.new as DbNote;
-          if (!newData) return;
-
-          // Ignore our own echoed saves (within a 3-second window)
-          const remoteTs = newData.updated_at;
-          if (remoteTs && Math.abs(remoteTs - lastSavedAtRef.current) < 3000) return;
-
-          // title + content are synced via Yjs; only update non-collaborative fields here
-          if (colorMap[newData.color] && newData.color !== colorRef.current) setColor(newData.color);
-          if (newData.is_public !== isPublicRef.current) setIsPublic(newData.is_public);
-          if (newData.pinned !== pinnedRef.current) setPinned(newData.pinned);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notes', filter: `id=eq.${note.id}` }, (payload) => {
+        const newData = payload.new as DbNote;
+        if (!newData) return;
+        const remoteTs = newData.updated_at;
+        if (remoteTs && Math.abs(remoteTs - lastSavedAtRef.current) < 3000) return;
+        if (colorMap[newData.color] && newData.color !== colorRef.current) setColor(newData.color);
+        if (newData.is_public !== isPublicRef.current) setIsPublic(newData.is_public);
+        if (newData.pinned !== pinnedRef.current) setPinned(newData.pinned);
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [note?.id]);
 
-  // Broadcast ref so we can send typing events from triggerSave without re-subscribing
   const broadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  interface TypingUser {
-    userId: string;
-    email: string;
-    fullName?: string | null;
-    avatarUrl?: string | null;
-    at: number;
-  }
-
-  // Typing indicators: map of userId -> { email, fullName, avatarUrl, at: timestamp }
+  interface TypingUser { userId: string; email: string; fullName?: string | null; avatarUrl?: string | null; at: number; }
   const [typingUsers, setTypingUsers] = useState<Record<string, TypingUser>>({});
 
-  // Combined presence + broadcast channel for live collaboration
   useEffect(() => {
     if (!note?.id || !user) return;
-
-    const colabChannel = supabase.channel(`collab_${note.id}`, {
-      config: { presence: { key: user.id } },
-    });
-
+    const colabChannel = supabase.channel(`collab_${note.id}`, { config: { presence: { key: user.id } } });
     broadcastChannelRef.current = colabChannel;
-
-    // Presence: who is viewing/editing right now
     colabChannel.on('presence', { event: 'sync' }, () => {
       const state = colabChannel.presenceState();
       const users: Record<string, PresenceUser> = {};
-      for (const id in state) {
-        users[id] = (state[id] as unknown as PresenceUser[])[0];
-      }
+      for (const id in state) users[id] = (state[id] as unknown as PresenceUser[])[0];
       setPresentUsers(users);
     });
-
-    // Broadcast: live typing events from other editors
     colabChannel.on('broadcast', { event: 'typing' }, ({ payload }) => {
       if (!payload || payload.userId === user.id) return;
-      setTypingUsers((prev) => ({
-        ...prev,
-        [payload.userId]: { ...payload, at: Date.now() } as TypingUser,
-      }));
+      setTypingUsers((prev) => ({ ...prev, [payload.userId]: { ...payload, at: Date.now() } as TypingUser }));
     });
-
     colabChannel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await colabChannel.track({
-          id: user.id,
-          email: user.email,
-          fullName: user.user_metadata?.full_name,
-          avatarUrl: user.user_metadata?.avatar_url,
-        });
+        await colabChannel.track({ id: user.id, email: user.email, fullName: user.user_metadata?.full_name, avatarUrl: user.user_metadata?.avatar_url });
       }
     });
-
-    // Prune stale typing indicators every 2s
     const pruneInterval = setInterval(() => {
       setTypingUsers((prev) => {
         const now = Date.now();
         const next = { ...prev };
         let changed = false;
-        for (const uid in next) {
-          if (now - next[uid].at > 3000) { delete next[uid]; changed = true; }
-        }
+        for (const uid in next) { if (now - next[uid].at > 3000) { delete next[uid]; changed = true; } }
         return changed ? next : prev;
       });
     }, 2000);
-
     return () => {
       broadcastChannelRef.current = null;
       supabase.removeChannel(colabChannel);
@@ -487,16 +420,10 @@ export const Editor = ({
   const triggerSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     setSaveStatus('saving');
-    // Broadcast that this user is actively typing
     if (broadcastChannelRef.current && user) {
       broadcastChannelRef.current.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: {
-          userId: user.id,
-          email: user.email,
-          fullName: user.user_metadata?.full_name,
-          avatarUrl: user.user_metadata?.avatar_url,
+        type: 'broadcast', event: 'typing', payload: {
+          userId: user.id, email: user.email, fullName: user.user_metadata?.full_name, avatarUrl: user.user_metadata?.avatar_url,
         },
       });
     }
@@ -519,7 +446,6 @@ export const Editor = ({
       } catch (err) {
         console.error('Failed to save note:', err);
         setSaveStatus('error');
-        // Reset to idle after 3s so user can keep typing
         setTimeout(() => setSaveStatus('idle'), 3000);
       }
     }, 650);
@@ -528,26 +454,20 @@ export const Editor = ({
   const handleChange = useCallback((field: 'title' | 'content' | 'color' | 'tags', value: string | string[]) => {
     if (field === 'title') setTitle(value as string);
     if (field === 'content') setContent(value as string);
-    if (field === 'color') {
-      setColor(value as string);
-      setShowColorPicker(false);
-    }
+    if (field === 'color') { setColor(value as string); setShowColorPicker(false); }
     if (field === 'tags') setTags(value as string[]);
     setSaveStatus('saving');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [setTitle, setContent]);
 
   useEffect(() => {
     if (!title && !content) return;
     triggerSave();
   }, [title, content, color, tags, pinned, isPublic, triggerSave]);
 
-  useEffect(() => () => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-  }, []);
+  useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
 
   const insertText = useCallback((prefix: string, suffix = '', placeholder = '', lineStart = false) => {
     if (!textareaRef.current) return;
-
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
     const selectedText = content.substring(start, end);
@@ -557,9 +477,7 @@ export const Editor = ({
     const newContent = content.substring(0, start) + insertionPrefix + innerText + suffix + content.substring(end);
     const selectionStart = start + insertionPrefix.length;
     const selectionEnd = selectionStart + innerText.length;
-
     handleChange('content', newContent);
-
     window.setTimeout(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(selectionStart, selectionEnd);
@@ -574,7 +492,6 @@ export const Editor = ({
     const textBeforeCursor = content.substring(0, cursor);
     const lastSlashIdx = textBeforeCursor.lastIndexOf('/');
     if (lastSlashIdx === -1) return;
-
     const beforeSlash = content.substring(0, lastSlashIdx);
     const afterCursor = content.substring(cursor);
     const { prefix, suffix = '', placeholder = '', lineStart = false } = cmd.insert;
@@ -583,90 +500,52 @@ export const Editor = ({
     const newContent = beforeSlash + insertionPrefix + placeholder + suffix + afterCursor;
     const selectionStart = lastSlashIdx + insertionPrefix.length;
     const selectionEnd = selectionStart + placeholder.length;
-
     handleChange('content', newContent);
     setSlashOpen(false);
     setSlashQuery('');
-
     window.setTimeout(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(selectionStart, selectionEnd);
     }, 0);
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Delete this note permanently?')) {
-      await onDelete();
-    }
-  };
-
+  const handleDelete = async () => { if (window.confirm('Delete this note permanently?')) { await onDelete(); } };
   const handlePinToggle = async () => {
     const newPinned = !pinned;
     setPinned(newPinned);
     if (note?.id && onTogglePin) await onTogglePin(note.id);
   };
-
   const handleShareToggle = () => {
-    if (!note?.id) {
-      alert('Please save the note first to share it.');
-      return;
-    }
+    if (!note?.id) { alert('Please save the note first to share it.'); return; }
     setShareSheetOpen(true);
   };
 
   const handleGenerateSummary = async () => {
     setShowSummary(true);
     if (isGeneratingSummary) return;
-
-    // Need at least some content to summarise
     if (!content.trim() || wordCount < 10) {
       setSummaryData(null);
       setSummaryError('Write a bit more before generating an insight.');
       return;
     }
-
     setIsGeneratingSummary(true);
     setSummaryError(null);
     setSummaryData(null);
-
-    const systemPrompt = `You are a note analyst. Analyse the note and return ONLY a valid JSON object — no markdown fences, no prose.
-
-JSON shape:
-{
-  "summary": string,         // 2-3 sentence plain-English summary of the note
-  "themes": string[],        // 2-4 key themes or topics (short noun phrases, ≤4 words each)
-  "actions": string[],       // 0-4 concrete action items you can infer from the note (imperative phrases); empty array if none
-  "suggestedTags": string[]  // 2-5 short tag words (lowercase, no spaces, no #) relevant to the content
-}
-
-Rules:
-- summary: be direct and useful, not generic
-- themes: extract the actual topics discussed, not meta commentary
-- actions: only include if genuinely inferable — leave empty rather than guess
-- suggestedTags: suggest tags different from the ones already on the note if possible`;
-
+    const systemPrompt = `You are a note analyst. Analyse the note and return ONLY a valid JSON object.
+JSON shape: { "summary": string, "themes": string[], "actions": string[], "suggestedTags": string[] }`;
     try {
       const existingTagsNote = tags.length > 0 ? `\n\nExisting tags: ${tags.join(', ')}` : '';
       const noteText = `Title: ${title || 'Untitled'}\n\n${content}${existingTagsNote}`;
-
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: noteText }],
-        }),
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, system: systemPrompt, messages: [{ role: 'user', content: noteText }] }),
       });
-
       if (!response.ok) throw new Error(`API error ${response.status}`);
-
       const data = await response.json();
       const text = data.content?.find((b: { type: string }) => b.type === 'text')?.text ?? '';
       const clean = text.replace(/```(?:json)?|```/g, '').trim();
       const parsed = JSON.parse(clean);
-
       setSummaryData({
         summary: typeof parsed.summary === 'string' ? parsed.summary : '',
         themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 4) : [],
@@ -676,9 +555,7 @@ Rules:
     } catch (err) {
       console.error('Summary failed:', err);
       setSummaryError('Couldn\'t generate insight — please try again.');
-    } finally {
-      setIsGeneratingSummary(false);
-    }
+    } finally { setIsGeneratingSummary(false); }
   };
 
   const handleCopySummary = () => {
@@ -694,17 +571,10 @@ Rules:
     });
   };
 
-  const handleAddSuggestedTag = (tag: string) => {
-    if (!tags.includes(tag)) {
-      handleChange('tags', [...tags, tag]);
-    }
-  };
-
+  const handleAddSuggestedTag = (tag: string) => { if (!tags.includes(tag)) { handleChange('tags', [...tags, tag]); } };
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, '');
-    if (t && !tags.includes(t)) {
-      handleChange('tags', [...tags, t]);
-    }
+    if (t && !tags.includes(t)) { handleChange('tags', [...tags, t]); }
     setTagInput('');
   };
 
@@ -712,147 +582,100 @@ Rules:
     const query = slashQuery.toLowerCase();
     return cmd.label.toLowerCase().includes(query) || cmd.id.includes(query) || cmd.description.toLowerCase().includes(query);
   });
-
   const groupedCommands = filteredCommands.reduce<Record<string, SlashCommand[]>>((acc, cmd) => {
     acc[cmd.category] = [...(acc[cmd.category] ?? []), cmd];
     return acc;
   }, {});
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      insertText('  ');
-      return;
-    }
-
+    if (e.key === 'Tab') { e.preventDefault(); insertText('  '); return; }
     if (!slashOpen) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSlashIndex((prev) => (prev + 1) % Math.max(filteredCommands.length, 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSlashIndex((prev) => (prev - 1 + Math.max(filteredCommands.length, 1)) % Math.max(filteredCommands.length, 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      executeSlashCommand(filteredCommands[slashIndex]);
-    } else if (e.key === 'Escape') {
-      setSlashOpen(false);
-    } else if (e.key === 'Backspace' && slashQuery === '') {
-      setSlashOpen(false);
-    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((prev) => (prev + 1) % Math.max(filteredCommands.length, 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((prev) => (prev - 1 + Math.max(filteredCommands.length, 1)) % Math.max(filteredCommands.length, 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); executeSlashCommand(filteredCommands[slashIndex]); }
+    else if (e.key === 'Escape') { setSlashOpen(false); }
+    else if (e.key === 'Backspace' && slashQuery === '') { setSlashOpen(false); }
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     handleChange('content', val);
-
     const cursor = e.target.selectionStart;
     const { prefix } = getLinePrefix(val, cursor);
-
-    if (prefix === '/') {
-      setSlashOpen(true);
-      setSlashQuery('');
-      setSlashIndex(0);
-      return;
-    }
-
+    if (prefix === '/') { setSlashOpen(true); setSlashQuery(''); setSlashIndex(0); return; }
     if (slashOpen) {
       const slashMatch = prefix.match(/\/([^\s/]*)$/);
-      if (slashMatch) {
-        setSlashQuery(slashMatch[1]);
-        setSlashIndex(0);
-      } else {
-        setSlashOpen(false);
-      }
+      if (slashMatch) { setSlashQuery(slashMatch[1]); setSlashIndex(0); }
+      else { setSlashOpen(false); }
     }
   };
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
   const readTime = estimateReadingTime(wordCount);
-  const bgHex = colorMap[color]?.hex ?? colorMap.alabaster.hex;
   const activeCommand = filteredCommands[slashIndex];
 
   return (
-    <div className={`relative flex h-full w-full overflow-hidden ${focusMode ? 'bg-white dark:bg-zinc-950' : ''}`}>
+    <div className={`relative flex h-full w-full overflow-hidden ${focusMode ? 'bg-background' : ''}`}>
       <motion.div
         layoutId={note ? `note-${note.id}` : 'new-note'}
-        className="flex h-full flex-1 flex-col overflow-hidden bg-[var(--note-bg)] transition-colors duration-300 dark:bg-zinc-950"
-        style={{ '--note-bg': bgHex } as React.CSSProperties}
+        className="flex h-full flex-1 flex-col overflow-hidden bg-background transition-colors duration-300"
+        style={{
+          background: focusMode ? 'var(--background)' : colorMap[color]?.hex
+        }}
       >
         <header
-          className={`sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b border-black/5 bg-[color-mix(in_srgb,var(--note-bg)_90%,transparent)] px-4 backdrop-blur-md transition-opacity duration-300 dark:border-white/10 dark:bg-zinc-950/90 ${focusMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
+          className={`sticky top-0 z-10 flex min-h-14 items-center gap-2 te-surface border-x-0 border-t-0 px-4 transition-opacity duration-300 ${focusMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
         >
-          <button onClick={onClose} className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100" aria-label="Back">
-            <ArrowLeft size={17} />
+          <button onClick={onClose} className="rounded-lg p-2 te-button text-muted-foreground" aria-label="Back">
+            <ArrowLeft size={15} />
           </button>
 
-          {/* Desktop markdown toolbar */}
-          <div className={`hidden items-center gap-1 rounded-lg bg-white/55 p-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 ${editorMode === 'preview' ? 'md:hidden' : 'md:flex'}`}>
-            <ToolbarButton label="Heading" onClick={() => insertText('## ', '', 'Heading', true)} icon={<Heading2 size={15} />} />
-            <ToolbarButton label="Bold" onClick={() => insertMarkdown('**')} icon={<Bold size={15} />} />
-            <ToolbarButton label="Italic" onClick={() => insertMarkdown('*')} icon={<Italic size={15} />} />
-            <ToolbarButton label="Strike" onClick={() => insertMarkdown('~~')} icon={<Strikethrough size={15} />} />
-            <ToolbarButton label="Code" onClick={() => insertText('`', '`', 'code')} icon={<Code size={15} />} />
-            <ToolbarButton label="Quote" onClick={() => insertText('> ', '', 'Quote', true)} icon={<Quote size={15} />} />
-            <ToolbarButton label="List" onClick={() => insertText('- ', '', 'List item', true)} icon={<List size={15} />} />
-            <ToolbarButton label="Task" onClick={() => insertText('- [ ] ', '', 'Todo', true)} icon={<CheckSquare size={15} />} />
-            <ToolbarButton label="Link" onClick={() => insertText('[', '](https://)', 'link')} icon={<Link size={15} />} />
+          {/* Desktop markdown toolbar - Industrial button strip */}
+          <div className={`hidden items-center gap-0.5 rounded-lg te-inset p-1 ${editorMode === 'preview' ? 'md:hidden' : 'md:flex'}`}>
+            <ToolbarButton label="Heading" onClick={() => insertText('## ', '', 'Heading', true)} icon={<Heading2 size={13} />} />
+            <ToolbarButton label="Bold" onClick={() => insertMarkdown('**')} icon={<Bold size={13} />} />
+            <ToolbarButton label="Italic" onClick={() => insertMarkdown('*')} icon={<Italic size={13} />} />
+            <ToolbarButton label="Strike" onClick={() => insertMarkdown('~~')} icon={<Strikethrough size={13} />} />
+            <ToolbarButton label="Code" onClick={() => insertText('`', '`', 'code')} icon={<Code size={13} />} />
+            <div className="w-px h-4 bg-border mx-1" />
+            <ToolbarButton label="Quote" onClick={() => insertText('> ', '', 'Quote', true)} icon={<Quote size={13} />} />
+            <ToolbarButton label="List" onClick={() => insertText('- ', '', 'List item', true)} icon={<List size={13} />} />
+            <ToolbarButton label="Task" onClick={() => insertText('- [ ] ', '', 'Todo', true)} icon={<CheckSquare size={13} />} />
+            <ToolbarButton label="Link" onClick={() => insertText('[', '](https://)', 'link')} icon={<Link size={13} />} />
           </div>
 
           <div className="flex-1" />
 
-          {/* Mobile: formatting toggle */}
-          {editorMode !== 'preview' && (
-            <button
-              onClick={() => { setShowMobileToolbar(v => !v); setShowMobileMore(false); }}
-              className={`rounded-lg p-2 transition-colors md:hidden ${showMobileToolbar ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
-              aria-label="Formatting"
-            >
-              <Menu size={16} />
-            </button>
-          )}
-
-          {/* Desktop mode switcher */}
-          <div className="hidden items-center rounded-lg bg-white/55 p-0.5 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10 sm:flex">
+          {/* Mode Switcher - Physical Rocker */}
+          <div className="hidden items-center rounded-lg te-inset p-0.5 sm:flex font-mono">
             <button
               onClick={() => setEditorMode('edit')}
-              title="Edit mode"
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'edit' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors ${editorMode === 'edit' ? 'te-surface text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              <Pencil size={13} />
-              Edit
+              <Pencil size={11} /> Edit
             </button>
             <button
               onClick={() => setEditorMode('split')}
-              title="Split mode"
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'split' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors ${editorMode === 'split' ? 'te-surface text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              <Columns2 size={13} />
-              Split
+              <Columns2 size={11} /> Split
             </button>
             <button
               onClick={() => setEditorMode('preview')}
-              title="Preview mode"
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${editorMode === 'preview' ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors ${editorMode === 'preview' ? 'te-surface text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              <Eye size={13} />
-              Preview
+              <Eye size={11} /> View
             </button>
           </div>
 
-          <button
-            onClick={() => setFocusMode((open) => !open)}
-            className={`hidden rounded-lg p-2 transition-colors sm:block ${focusMode ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`}
-            aria-label="Focus mode"
-          >
-            <Focus size={15} />
+          <button onClick={() => setFocusMode((open) => !open)} className={`hidden rounded-lg p-2 transition-colors sm:block te-button ${focusMode ? 'text-primary border-primary bg-primary/10' : 'text-muted-foreground'}`} aria-label="Focus mode">
+            <Focus size={13} />
           </button>
 
           <div className="relative">
-            <button onClick={() => setShowColorPicker(!showColorPicker)} className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100" aria-label="Background color">
-              <Palette size={16} />
+            <button onClick={() => setShowColorPicker(!showColorPicker)} className="rounded-lg p-2 te-button text-muted-foreground" aria-label="Background color">
+              <Palette size={13} />
             </button>
             <AnimatePresence>
               {showColorPicker && (
@@ -860,18 +683,18 @@ Rules:
                   initial={{ opacity: 0, scale: 0.96, y: -6 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96, y: -6 }}
-                  transition={{ duration: 0.14 }}
-                  className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+                  className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl te-surface p-2 shadow-2xl"
                 >
+                  <div className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest mb-2 px-2 uppercase">PAPER TYPE</div>
                   {Object.entries(colorMap).map(([key, val]) => (
                     <button
                       key={key}
                       onClick={() => handleChange('color', key)}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                      className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-xs font-bold font-mono transition-colors hover:bg-muted"
                     >
-                      <span className="h-5 w-5 flex-shrink-0 rounded-full border" style={{ backgroundColor: val.hex, borderColor: val.ring }} />
-                      <span className="flex-1 text-left">{val.label}</span>
-                      {color === key && <Check size={14} className="text-gray-700 dark:text-zinc-200" />}
+                      <span className="h-4 w-4 flex-shrink-0 rounded-full border border-border" style={{ backgroundColor: val.hex }} />
+                      <span className="flex-1 text-left uppercase tracking-wider">{val.label}</span>
+                      {color === key && <Check size={12} className="text-primary" />}
                     </button>
                   ))}
                 </motion.div>
@@ -879,67 +702,53 @@ Rules:
             </AnimatePresence>
           </div>
 
-          <button onClick={handlePinToggle} className={`hidden rounded-lg p-2 transition-colors sm:block ${pinned ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100'}`} aria-label={pinned ? 'Unpin' : 'Pin'}>
-            {pinned ? <Pin size={15} /> : <PinOff size={15} />}
-          </button>
-          {/* Mobile: more menu button */}
-          <button
-            onClick={() => { setShowMobileMore(v => !v); setShowMobileToolbar(false); }}
-            className={`rounded-lg p-2 transition-colors sm:hidden ${showMobileMore ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-500 hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10'}`}
-            aria-label="More options"
-          >
-            <MoreHorizontal size={16} />
+          <button onClick={handlePinToggle} className={`hidden rounded-lg p-2 transition-colors sm:block te-button ${pinned ? 'text-primary' : 'text-muted-foreground'}`} aria-label={pinned ? 'Unpin' : 'Pin'}>
+            {pinned ? <Pin size={13} /> : <PinOff size={13} />}
           </button>
 
-          <div className="flex items-center gap-1 mr-2">
+          {/* Collaborators */}
+          <div className="flex items-center gap-1 mr-1 ml-1">
             {Object.values(presentUsers).filter((u) => u.id !== user?.id).map((u) => {
               const isTyping = !!typingUsers[u.id];
-              // Deterministic avatar color
               const palette = ['bg-rose-400', 'bg-orange-400', 'bg-amber-400', 'bg-emerald-500', 'bg-teal-500', 'bg-sky-500', 'bg-indigo-500', 'bg-violet-500', 'bg-pink-500'];
               let h = 0; for (let i = 0; i < (u.id || '').length; i++) h = (h * 31 + (u.id || '').charCodeAt(i)) >>> 0;
               const avatarBg = palette[h % palette.length];
               return (
-                <div
-                  key={u.id}
-                  className="group relative flex h-7 w-7 items-center justify-center rounded-full ring-2 ring-white dark:ring-zinc-900"
-                >
+                <div key={u.id} className="group relative flex h-7 w-7 items-center justify-center rounded-full te-surface border border-border">
                   {u.avatarUrl ? (
                     <img src={u.avatarUrl} alt={u.fullName || u.email} className="h-full w-full rounded-full object-cover" />
                   ) : (
-                    <div className={`h-full w-full rounded-full ${avatarBg} flex items-center justify-center`}>
-                      <span className="text-[10px] font-bold text-white">{(u.email || '?').charAt(0).toUpperCase()}</span>
-                    </div>
+                    <div className={`h-full w-full rounded-full ${avatarBg} flex items-center justify-center`}><span className="text-[10px] font-bold text-white">{(u.email || '?').charAt(0).toUpperCase()}</span></div>
                   )}
-                  {isTyping && (
-                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-500 ring-1 ring-white dark:ring-zinc-900">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                    </span>
-                  )}
-                  <div className="absolute top-full z-50 mt-1.5 hidden whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1.5 text-[10px] text-white shadow-lg group-hover:block dark:bg-zinc-800 pointer-events-none">
-                    <p className="font-semibold">{u.fullName || u.email}</p>
-                    {isTyping && <p className="text-emerald-400">editing now...</p>}
+                  {isTyping && <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary ring-2 ring-background"><span className="h-1 w-1 animate-pulse rounded-full bg-white" /></span>}
+                  <div className="absolute top-full z-50 mt-1.5 hidden whitespace-nowrap rounded-lg te-surface px-2 py-1.5 text-[10px] font-mono shadow-lg group-hover:block pointer-events-none">
+                    <p className="font-bold uppercase tracking-wider">{u.fullName || u.email}</p>
+                    {isTyping && <p className="text-primary mt-0.5">// EDITING</p>}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <button onClick={handleShareToggle} className="hidden rounded-lg p-2 text-gray-500 transition-colors hover:bg-black/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100 sm:block" aria-label="Share">
-            <Share size={15} />
+          <button onClick={handleShareToggle} className="hidden rounded-lg p-2 te-button text-muted-foreground sm:block" aria-label="Share">
+            <Share size={13} />
           </button>
 
-          <button onClick={handleGenerateSummary} className="hidden items-center gap-1.5 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-black/5 transition-colors hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-zinc-800 sm:flex">
-            <Sparkles size={14} />
-            Insight
+          <button onClick={handleGenerateSummary} className="hidden items-center gap-1.5 rounded-lg te-button px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-foreground sm:flex">
+            <Radio size={12} className="text-primary" />
+            ANALYZE
           </button>
 
-          <button onClick={handleDelete} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-zinc-500 dark:hover:bg-red-500/10 dark:hover:text-red-300" aria-label="Delete note">
-            <Trash2 size={16} />
+          <button onClick={handleDelete} className="rounded-lg p-2 te-button-destructive text-white" aria-label="Delete note">
+            <Trash2 size={13} />
+          </button>
+          
+          <button onClick={() => { setShowMobileMore(v => !v); setShowMobileToolbar(false); }} className={`rounded-lg p-2 transition-colors sm:hidden te-button ${showMobileMore ? 'text-primary' : 'text-muted-foreground'}`}>
+            <MoreHorizontal size={15} />
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* ── Edit pane ── hidden in preview mode */}
+        <div className="flex min-h-0 flex-1 overflow-hidden relative">
           <AnimatePresence initial={false}>
             {editorMode !== 'preview' && (
               <motion.div
@@ -948,81 +757,80 @@ Rules:
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.18 }}
-                className={`min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10 ${editorMode === 'split' ? 'border-r border-black/5 dark:border-white/10 md:px-10 lg:px-12' : 'md:px-16 lg:px-24'}`}
+                className={`min-w-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10 ${!focusMode && 'te-ruled-lines'} ${editorMode === 'split' ? 'border-r border-border md:px-10 lg:px-12' : 'md:px-16 lg:px-24'}`}
               >
                 <div className="mx-auto flex w-full max-w-3xl flex-col">
-                  <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
-                    <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
-                    <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
-                    {pinned && <span className="rounded-full bg-gray-950 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-zinc-950">Pinned</span>}
+                  {/* Status Badges */}
+                  <div className="mb-5 flex flex-wrap items-center gap-2">
+                    <span className="rounded te-inset px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest text-muted-foreground border-none bg-muted/50">{readTime}M READ</span>
+                    <span className="rounded te-inset px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest text-muted-foreground border-none bg-muted/50">{wordCount} W</span>
+                    {pinned && <span className="rounded te-surface bg-primary text-primary-foreground px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest border-none">PINNED</span>}
                   </div>
 
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => handleChange('title', e.target.value)}
-                    placeholder="Untitled"
-                    className="mb-5 w-full border-none bg-transparent text-4xl font-bold leading-tight tracking-tight text-gray-950 outline-none placeholder:text-gray-300 dark:text-zinc-50 dark:placeholder:text-zinc-700 sm:text-5xl"
+                    placeholder="UNTITLED"
+                    className="mb-5 w-full border-none bg-transparent text-4xl font-bold font-sans tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40 sm:text-5xl te-emboss uppercase"
                   />
 
-                  <div className="mb-6 flex flex-wrap items-center gap-1.5">
+                  {/* Tags */}
+                  <div className="mb-8 flex flex-wrap items-center gap-2">
                     {tags.map((tag) => (
-                      <span key={tag} className="flex items-center gap-1 rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">
-                        #{tag}
-                        <button onClick={() => handleChange('tags', tags.filter((t) => t !== tag))} className="rounded-full p-0.5 transition-colors hover:bg-black/5 hover:text-red-500 dark:hover:bg-white/10 dark:hover:text-red-300" aria-label={`Remove ${tag} tag`}>
+                      <span key={tag} className="flex items-center gap-1 rounded te-inset px-2 py-1 text-[10px] font-mono font-bold tracking-wider text-muted-foreground border-none bg-muted/50">
+                        #{tag.toUpperCase()}
+                        <button onClick={() => handleChange('tags', tags.filter((t) => t !== tag))} className="rounded p-0.5 hover:bg-destructive hover:text-white transition-colors">
                           <X size={10} />
                         </button>
                       </span>
                     ))}
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onBlur={() => tagInput.trim() && addTag()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ',') {
-                          e.preventDefault();
-                          addTag();
-                        }
-                      }}
-                      placeholder="+ tag"
-                      className="w-20 border-none bg-transparent text-xs text-gray-500 outline-none placeholder:text-gray-400 dark:text-zinc-400 dark:placeholder:text-zinc-600"
-                    />
+                    <div className="relative flex items-center">
+                      <span className="text-muted-foreground text-[10px] font-mono font-bold mr-1">+</span>
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onBlur={() => tagInput.trim() && addTag()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }}
+                        placeholder="TAG"
+                        className="w-20 border-none bg-transparent text-[10px] font-mono font-bold text-muted-foreground outline-none placeholder:text-muted-foreground/50 uppercase"
+                      />
+                    </div>
                   </div>
 
+                  {/* Editor Area */}
                   <div className="relative">
                     <textarea
                       ref={textareaRef}
                       value={content}
                       onChange={handleContentChange}
                       onKeyDown={handleKeyDown}
-                      placeholder="Start writing... type '/' for commands"
-                      className="min-h-[520px] w-full flex-1 resize-none border-none bg-transparent text-[17px] leading-[1.85] text-gray-700 outline-none placeholder:text-gray-300 dark:text-zinc-300 dark:placeholder:text-zinc-700"
+                      placeholder="// START WRITING... TYPE '/' FOR COMMANDS"
+                      className="min-h-[520px] w-full flex-1 resize-none border-none bg-transparent text-base font-sans leading-[1.8] text-foreground outline-none placeholder:text-muted-foreground/40 placeholder:font-mono"
                       spellCheck
                     />
 
+                    {/* Slash Command Menu */}
                     <AnimatePresence>
                       {slashOpen && (
                         <motion.div
                           initial={{ opacity: 0, y: 8, scale: 0.98 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                          transition={{ duration: 0.14 }}
-                          className="absolute left-0 top-10 z-50 w-[min(26rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900"
+                          className="absolute left-0 top-10 z-50 w-[24rem] overflow-hidden rounded-xl te-surface shadow-2xl"
                         >
-                          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-zinc-800">
-                            <AlignLeft size={14} className="text-gray-400 dark:text-zinc-500" />
-                            <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400">Type to filter commands</span>
-                            <span className="ml-auto rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-zinc-800 dark:text-zinc-500">Esc</span>
+                          <div className="flex items-center gap-2 border-b border-border px-3 py-2 bg-muted">
+                            <span className="text-[10px] font-mono font-bold text-muted-foreground tracking-widest">COMMAND LINE</span>
+                            <span className="ml-auto rounded te-inset bg-background px-1.5 py-0.5 text-[9px] font-mono font-bold text-muted-foreground">ESC</span>
                           </div>
-
                           {filteredCommands.length === 0 ? (
-                            <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-zinc-500">No command found for &ldquo;{slashQuery}&rdquo;</div>
+                            <div className="px-4 py-6 text-center text-[10px] font-mono text-muted-foreground">NO MATCH FOR "{slashQuery.toUpperCase()}"</div>
                           ) : (
-                            <div className="max-h-80 overflow-y-auto p-1.5">
+                            <div className="max-h-80 overflow-y-auto p-2">
                               {Object.entries(groupedCommands).map(([category, commands]) => (
                                 <div key={category} className="py-1">
-                                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{category}</div>
+                                  <div className="px-2 py-1 text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground/70">{category}</div>
                                   {commands.map((cmd) => {
                                     const flatIndex = filteredCommands.findIndex((item) => item.id === cmd.id);
                                     const active = activeCommand?.id === cmd.id;
@@ -1031,14 +839,14 @@ Rules:
                                         key={cmd.id}
                                         onClick={() => executeSlashCommand(cmd)}
                                         onMouseEnter={() => setSlashIndex(flatIndex)}
-                                        className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'text-gray-700 hover:bg-gray-50 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}
+                                        className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${active ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'}`}
                                       >
-                                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-white/15 text-white dark:bg-zinc-950/10 dark:text-zinc-950' : 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                                        <span className={`flex h-7 w-7 items-center justify-center rounded-md ${active ? 'bg-white/20' : 'te-inset bg-background'}`}>
                                           {cmd.icon}
                                         </span>
                                         <span className="min-w-0 flex-1">
-                                          <span className="block text-sm font-semibold">{cmd.label}</span>
-                                          <span className={`block truncate text-xs ${active ? 'text-white/65 dark:text-zinc-600' : 'text-gray-400 dark:text-zinc-500'}`}>{cmd.description}</span>
+                                          <span className="block text-xs font-bold font-mono tracking-wide">{cmd.label.toUpperCase()}</span>
+                                          <span className={`block text-[10px] font-mono truncate ${active ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{cmd.description}</span>
                                         </span>
                                       </button>
                                     );
@@ -1056,7 +864,7 @@ Rules:
             )}
           </AnimatePresence>
 
-          {/* ── Preview pane ── shown in preview and split modes ── */}
+          {/* Preview Pane */}
           <AnimatePresence initial={false}>
             {editorMode !== 'edit' && (
               <motion.div
@@ -1065,33 +873,24 @@ Rules:
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 16 }}
                 transition={{ duration: 0.18 }}
-                className={`min-w-0 overflow-y-auto bg-white/65 backdrop-blur-xl dark:bg-zinc-900/70 ${editorMode === 'preview' ? 'flex-1 px-5 py-8 sm:px-10 md:px-16 lg:px-24' : 'flex-1 px-6 py-8 lg:px-10'}`}
+                className={`min-w-0 overflow-y-auto bg-background/50 backdrop-blur-md ${editorMode === 'preview' ? 'flex-1 px-5 py-8 sm:px-10 md:px-16 lg:px-24' : 'flex-1 px-6 py-8 lg:px-10'}`}
               >
                 <div className={`mx-auto w-full max-w-3xl ${editorMode === 'split' ? 'max-w-none' : ''}`}>
-                  {/* In preview mode, show the title too */}
                   {editorMode === 'preview' && (
                     <>
-                      <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 dark:text-zinc-400">
-                        <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{readTime} min read</span>
-                        <span className="rounded-full bg-white/60 px-2.5 py-1 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:ring-white/10">{wordCount} words</span>
+                      <div className="mb-5 flex flex-wrap items-center gap-2">
+                        <span className="rounded te-inset px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest text-muted-foreground border-none bg-muted/50">{readTime}M READ</span>
+                        <span className="rounded te-inset px-2 py-0.5 text-[9px] font-mono font-bold tracking-widest text-muted-foreground border-none bg-muted/50">{wordCount} W</span>
                       </div>
-                      <h1 className="mb-6 text-4xl font-bold tracking-tight text-gray-950 dark:text-zinc-50 sm:text-5xl">{title || <span className="text-gray-300 dark:text-zinc-700">Untitled</span>}</h1>
-                      {tags.length > 0 && (
-                        <div className="mb-8 flex flex-wrap gap-1.5">
-                          {tags.map((tag) => (
-                            <span key={tag} className="rounded-full bg-white/60 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm ring-1 ring-black/5 dark:bg-zinc-900/80 dark:text-zinc-300 dark:ring-white/10">#{tag}</span>
-                          ))}
-                        </div>
-                      )}
+                      <h1 className="mb-6 text-4xl font-bold font-sans tracking-tight text-foreground uppercase te-emboss sm:text-5xl">{title || <span className="text-muted-foreground">UNTITLED</span>}</h1>
                     </>
                   )}
-                  {/* Split mode: small label */}
                   {editorMode === 'split' && (
-                    <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 dark:text-zinc-600">
-                      <Eye size={11} /> Preview
+                    <div className="mb-4 flex items-center gap-2 text-[10px] font-bold font-mono uppercase tracking-widest text-muted-foreground">
+                      <Eye size={11} /> PREVIEW
                     </div>
                   )}
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <div className="prose prose-sm max-w-none dark:prose-invert font-sans">
                     {renderPreview(content)}
                   </div>
                 </div>
@@ -1100,75 +899,64 @@ Rules:
           </AnimatePresence>
         </div>
 
-        <div className="flex h-10 flex-shrink-0 items-center justify-between border-t border-black/5 px-5 text-[11px] font-medium text-gray-400 dark:border-white/10 dark:text-zinc-500">
-          <div className="flex items-center gap-4">
-            <span>{charCount} chars</span>
-            <span>{content.split('\n').length} lines</span>
+        {/* Cassette-tape status bar */}
+        <div className="flex h-8 flex-shrink-0 items-center justify-between te-inset rounded-none border-x-0 border-b-0 px-4">
+          <div className="flex items-center gap-4 text-[9px] font-bold font-mono tracking-widest uppercase text-muted-foreground">
+            <span>{charCount} C</span>
+            <span>{content.split('\n').length} L</span>
           </div>
           <AnimatePresence mode="wait">
             {isSyncing && (
-              <motion.span key="syncing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-sky-500 dark:text-sky-400">
-                <Loader2 size={11} className="animate-spin" />
-                Syncing peers...
+              <motion.span key="syncing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-[9px] font-bold font-mono tracking-widest uppercase text-primary">
+                <Loader2 size={10} className="animate-spin" /> SYNCING...
               </motion.span>
             )}
             {!isSyncing && saveStatus === 'saving' && (
-              <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-gray-500 dark:text-zinc-400">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gray-400 opacity-75 dark:bg-zinc-500" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-zinc-500" />
-                </span>
-                Saving...
+              <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-[9px] font-bold font-mono tracking-widest uppercase text-primary">
+                <span className="w-1.5 h-1.5 rounded-full te-led te-led-on animate-pulse" />
+                REC...
               </motion.span>
             )}
             {!isSyncing && saveStatus === 'saved' && (
-              <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-gray-400 dark:text-zinc-500">
-                Saved
+              <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1.5 text-[9px] font-bold font-mono tracking-widest uppercase text-muted-foreground">
+                <span className="w-1.5 h-1.5 rounded-full te-led te-led-off" />
+                SAVED
               </motion.span>
             )}
           </AnimatePresence>
         </div>
 
-        {/* ══════════════════════════════════════════════
-            MOBILE FORMATTING TOOLBAR  (slide up from bottom of content)
-            Shown when the Menu button is tapped on mobile
-            ══════════════════════════════════════════════ */}
+        {/* Mobile Format Toolbar */}
         <AnimatePresence>
           {showMobileToolbar && (
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="absolute bottom-0 left-0 right-0 z-30 sm:hidden border-t border-black/5 bg-[color-mix(in_srgb,var(--note-bg)_95%,transparent)] backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/95"
-              style={{ '--note-bg': bgHex } as React.CSSProperties}
+              className="absolute bottom-0 left-0 right-0 z-30 sm:hidden te-surface rounded-t-2xl pb-4"
             >
-              <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/10">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Formatting</span>
-                <button onClick={() => setShowMobileToolbar(false)} className="rounded-lg p-1 text-gray-400">
-                  <X size={14} />
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/50 rounded-t-2xl">
+                <span className="text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground">FORMAT</span>
+                <button onClick={() => setShowMobileToolbar(false)} className="rounded p-1 text-muted-foreground hover:bg-background">
+                  <X size={12} />
                 </button>
               </div>
-              <div className="grid grid-cols-5 gap-0 p-2">
+              <div className="grid grid-cols-5 gap-2 p-3">
                 {[
-                  { label: 'H2', icon: <Heading2 size={16} />, action: () => insertText('## ', '', 'Heading', true) },
-                  { label: 'Bold', icon: <Bold size={16} />, action: () => insertMarkdown('**') },
-                  { label: 'Italic', icon: <Italic size={16} />, action: () => insertMarkdown('*') },
-                  { label: 'Strike', icon: <Strikethrough size={16} />, action: () => insertMarkdown('~~') },
-                  { label: 'Code', icon: <Code size={16} />, action: () => insertText('`', '`', 'code') },
-                  { label: 'Quote', icon: <Quote size={16} />, action: () => insertText('> ', '', 'Quote', true) },
-                  { label: 'List', icon: <List size={16} />, action: () => insertText('- ', '', 'List item', true) },
-                  { label: 'Task', icon: <CheckSquare size={16} />, action: () => insertText('- [ ] ', '', 'Todo', true) },
-                  { label: 'Link', icon: <Link size={16} />, action: () => insertText('[', '](https://)', 'link') },
-                  { label: 'H3', icon: <Heading3 size={16} />, action: () => insertText('### ', '', 'Heading', true) },
+                  { label: 'H2', icon: <Heading2 size={14} />, action: () => insertText('## ', '', 'Heading', true) },
+                  { label: 'BOLD', icon: <Bold size={14} />, action: () => insertMarkdown('**') },
+                  { label: 'ITAL', icon: <Italic size={14} />, action: () => insertMarkdown('*') },
+                  { label: 'STRK', icon: <Strikethrough size={14} />, action: () => insertMarkdown('~~') },
+                  { label: 'CODE', icon: <Code size={14} />, action: () => insertText('`', '`', 'code') },
+                  { label: 'QUOTE', icon: <Quote size={14} />, action: () => insertText('> ', '', 'Quote', true) },
+                  { label: 'LIST', icon: <List size={14} />, action: () => insertText('- ', '', 'List item', true) },
+                  { label: 'TASK', icon: <CheckSquare size={14} />, action: () => insertText('- [ ] ', '', 'Todo', true) },
+                  { label: 'LINK', icon: <Link size={14} />, action: () => insertText('[', '](https://)', 'link') },
+                  { label: 'H3', icon: <Heading3 size={14} />, action: () => insertText('### ', '', 'Heading', true) },
                 ].map(({ label, icon, action }) => (
-                  <button
-                    key={label}
-                    onClick={() => { action(); setShowMobileToolbar(false); }}
-                    className="flex flex-col items-center gap-1 rounded-xl p-3 text-gray-600 transition-colors active:bg-black/5 dark:text-zinc-400 dark:active:bg-white/10"
-                  >
+                  <button key={label} onClick={() => { action(); setShowMobileToolbar(false); }} className="flex flex-col items-center gap-1.5 rounded-lg p-2 te-button text-muted-foreground">
                     {icon}
-                    <span className="text-[9px] font-semibold">{label}</span>
+                    <span className="text-[8px] font-bold font-mono">{label}</span>
                   </button>
                 ))}
               </div>
@@ -1176,78 +964,39 @@ Rules:
           )}
         </AnimatePresence>
 
-        {/* ══════════════════════════════════════════════
-            MOBILE MORE MENU (slide up)
-            Pin, Share, Mode switch, Insight, Focus, Delete
-            ══════════════════════════════════════════════ */}
+        {/* Mobile More Options */}
         <AnimatePresence>
           {showMobileMore && (
             <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-30 sm:hidden"
-                onClick={() => setShowMobileMore(false)}
-              />
-              <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="absolute bottom-0 left-0 right-0 z-40 sm:hidden rounded-t-2xl border-t border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950"
-              >
-                {/* Drag handle */}
-                <div className="flex justify-center pt-3 pb-1">
-                  <div className="h-1 w-10 rounded-full bg-gray-200 dark:bg-zinc-700" />
-                </div>
-
-                {/* Mode switcher */}
-                <div className="px-4 pb-2 pt-1">
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">View Mode</p>
-                  <div className="flex gap-2">
-                    {([
-                      { mode: 'edit' as const, icon: <Pencil size={14} />, label: 'Edit' },
-                      { mode: 'preview' as const, icon: <Eye size={14} />, label: 'Preview' },
-                    ] as const).map(({ mode, icon, label }) => (
-                      <button
-                        key={mode}
-                        onClick={() => { setEditorMode(mode); setShowMobileMore(false); }}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${editorMode === mode ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-300'}`}
-                      >
-                        {icon}{label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Actions grid */}
-                <div className="grid grid-cols-4 gap-1 px-3 py-2">
-                  {[
-                    { label: pinned ? 'Unpin' : 'Pin', icon: pinned ? <Pin size={18} /> : <PinOff size={18} />, action: handlePinToggle, active: pinned },
-                    { label: 'Share', icon: <Share size={18} />, action: () => { setShowMobileMore(false); handleShareToggle(); }, active: false },
-                    { label: 'Insight', icon: <Sparkles size={18} />, action: () => { setShowMobileMore(false); handleGenerateSummary(); }, active: showSummary },
-                    { label: 'Focus', icon: <Focus size={18} />, action: () => { setFocusMode(v => !v); setShowMobileMore(false); }, active: focusMode },
-                    { label: 'Color', icon: <Palette size={18} />, action: () => { setShowColorPicker(v => !v); setShowMobileMore(false); }, active: false },
-                  ].map(({ label, icon, action, active }) => (
-                    <button
-                      key={label}
-                      onClick={action}
-                      className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition-colors ${active ? 'bg-gray-950 text-white dark:bg-zinc-100 dark:text-zinc-950' : 'bg-gray-50 text-gray-700 dark:bg-zinc-900 dark:text-zinc-300'}`}
-                    >
-                      {icon}
-                      {label}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => { setShowMobileMore(false); handleDelete(); }}
-                    className="flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400 transition-colors"
-                  >
-                    <Trash2 size={18} />
-                    Delete
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-30 sm:hidden bg-background/80 backdrop-blur-sm" onClick={() => setShowMobileMore(false)} />
+              <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute bottom-0 left-0 right-0 z-40 sm:hidden rounded-t-2xl te-surface pb-6">
+                <div className="flex justify-center pt-3 pb-2"><div className="h-1 w-10 rounded-full bg-border" /></div>
+                <div className="grid grid-cols-4 gap-2 px-4 py-2">
+                  <button onClick={handlePinToggle} className={`flex flex-col items-center gap-1.5 rounded-xl py-3 te-button ${pinned ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {pinned ? <Pin size={16} /> : <PinOff size={16} />}
+                    <span className="text-[9px] font-bold font-mono uppercase">{pinned ? 'UNPIN' : 'PIN'}</span>
+                  </button>
+                  <button onClick={() => { setShowMobileMore(false); handleShareToggle(); }} className="flex flex-col items-center gap-1.5 rounded-xl py-3 te-button text-muted-foreground">
+                    <Share size={16} />
+                    <span className="text-[9px] font-bold font-mono uppercase">SHARE</span>
+                  </button>
+                  <button onClick={() => { setShowMobileMore(false); handleGenerateSummary(); }} className="flex flex-col items-center gap-1.5 rounded-xl py-3 te-button text-muted-foreground">
+                    <Radio size={16} className="text-primary" />
+                    <span className="text-[9px] font-bold font-mono uppercase">ANALYZE</span>
+                  </button>
+                  <button onClick={() => { setFocusMode(v => !v); setShowMobileMore(false); }} className={`flex flex-col items-center gap-1.5 rounded-xl py-3 te-button ${focusMode ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <Focus size={16} />
+                    <span className="text-[9px] font-bold font-mono uppercase">FOCUS</span>
+                  </button>
+                  <button onClick={() => { setShowColorPicker(v => !v); setShowMobileMore(false); }} className="flex flex-col items-center gap-1.5 rounded-xl py-3 te-button text-muted-foreground">
+                    <Palette size={16} />
+                    <span className="text-[9px] font-bold font-mono uppercase">PAPER</span>
+                  </button>
+                  <button onClick={() => { setShowMobileMore(false); handleDelete(); }} className="flex flex-col items-center gap-1.5 rounded-xl py-3 te-button-destructive">
+                    <Trash2 size={16} />
+                    <span className="text-[9px] font-bold font-mono uppercase">DELETE</span>
                   </button>
                 </div>
-                <div className="h-safe-area-inset-bottom pb-4" />
               </motion.div>
             </>
           )}
@@ -1262,10 +1011,7 @@ Rules:
             noteOwnerId={note.userId}
             isPublic={isPublic}
             shareSlug={note.shareSlug}
-            onTogglePublicShare={async (id, pub, slug) => {
-              // Pass slug directly to togglePublicShare so it's persisted atomically
-              await onTogglePublicShare(id, pub, slug);
-            }}
+            onTogglePublicShare={onTogglePublicShare}
             getCollaborators={getCollaborators}
             addCollaborator={addCollaborator}
             removeCollaborator={removeCollaborator}
@@ -1275,140 +1021,90 @@ Rules:
         )}
       </AnimatePresence>
 
+      {/* AI Insight Panel */}
       <AnimatePresence>
         {showSummary && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-            className="flex h-full w-full flex-shrink-0 flex-col overflow-hidden border-l border-gray-100 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:w-80"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex h-full w-full flex-shrink-0 flex-col overflow-hidden border-l border-border te-surface md:w-80"
           >
-            {/* Panel header */}
-            <div className="flex h-14 items-center justify-between border-b border-gray-100 px-4 dark:border-zinc-800">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-zinc-200">
-                <Sparkles size={15} className="text-indigo-400" /> Note Insight
+            <div className="flex h-14 items-center justify-between border-b border-border bg-muted px-4">
+              <div className="flex items-center gap-2 text-[10px] font-bold font-mono uppercase tracking-widest text-muted-foreground">
+                <Radio size={12} className="text-primary" /> ANALYSIS MODULE
               </div>
               <div className="flex items-center gap-1">
                 {summaryData && !isGeneratingSummary && (
-                  <button
-                    onClick={handleGenerateSummary}
-                    title="Regenerate"
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900"
-                  >
-                    <RefreshCw size={13} />
-                  </button>
+                  <button onClick={handleGenerateSummary} className="rounded p-1 text-muted-foreground hover:bg-background te-button"><RefreshCw size={11} /></button>
                 )}
-                <button onClick={() => setShowSummary(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:text-zinc-500 dark:hover:bg-zinc-900">
-                  <X size={15} />
-                </button>
+                <button onClick={() => setShowSummary(false)} className="rounded p-1 text-muted-foreground hover:bg-background te-button"><X size={11} /></button>
               </div>
             </div>
 
-            {/* Panel body */}
-            <div className="flex-1 overflow-y-auto p-5">
-
-              {/* Stats row — always shown */}
-              <div className="mb-5 grid grid-cols-3 gap-2">
-                <Stat label="Words" value={wordCount.toString()} />
-                <Stat label="Read" value={`${readTime} min`} />
-                <Stat label="Lines" value={content.split('\n').filter(l => l.trim()).length.toString()} />
+            <div className="flex-1 overflow-y-auto p-5 relative te-noise">
+              <div className="mb-6 grid grid-cols-3 gap-2">
+                <Stat label="WORDS" value={wordCount.toString()} />
+                <Stat label="TIME" value={`${readTime}M`} />
+                <Stat label="LINES" value={content.split('\n').filter(l => l.trim()).length.toString()} />
               </div>
 
-              {/* Loading skeleton */}
               {isGeneratingSummary && (
-                <div className="space-y-5">
-                  <div className="flex items-center gap-2 text-xs font-medium text-indigo-400 dark:text-indigo-500">
-                    <Loader2 size={13} className="animate-spin" />
-                    Reading your note…
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-[10px] font-bold font-mono uppercase tracking-widest text-primary">
+                    <Loader2 size={12} className="animate-spin" /> PROCESSING...
                   </div>
                   <div className="space-y-3">
-                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '90%' }} />
-                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '78%' }} />
-                    <div className="h-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: '84%' }} />
-                  </div>
-                  <div className="space-y-2 pt-2">
-                    {[60, 45, 70].map((w, i) => (
-                      <div key={i} className="h-6 rounded-lg bg-gray-100 dark:bg-zinc-800 animate-pulse" style={{ width: `${w}%` }} />
-                    ))}
+                    <div className="h-2 bg-primary/20 animate-pulse w-[90%]" />
+                    <div className="h-2 bg-primary/20 animate-pulse w-[75%]" />
+                    <div className="h-2 bg-primary/20 animate-pulse w-[85%]" />
                   </div>
                 </div>
               )}
 
-              {/* Error state */}
               {!isGeneratingSummary && summaryError && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                  <p className="text-sm text-amber-500 dark:text-amber-400">{summaryError}</p>
+                <div className="space-y-4">
+                  <p className="text-xs font-mono text-destructive uppercase">{summaryError}</p>
                   {wordCount >= 10 && (
-                    <button
-                      onClick={handleGenerateSummary}
-                      className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
-                    >
-                      <Sparkles size={12} /> Try again
+                    <button onClick={handleGenerateSummary} className="te-button-primary rounded px-3 py-1.5 text-[10px] font-bold font-mono uppercase tracking-widest flex items-center gap-2">
+                      <RefreshCw size={10} /> RETRY
                     </button>
                   )}
-                </motion.div>
+                </div>
               )}
 
-              {/* Empty / not yet generated */}
               {!isGeneratingSummary && !summaryError && !summaryData && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4 pt-4 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10">
-                    <Sparkles size={22} className="text-indigo-400" />
+                <div className="flex flex-col items-center gap-4 pt-10 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl te-inset border-border border shadow-inner">
+                    <Radio size={24} className="text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-700 dark:text-zinc-300">AI Note Insight</p>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-zinc-500 leading-relaxed">
-                      Get a summary, key themes, action items, and tag suggestions for this note.
-                    </p>
+                    <p className="text-[10px] font-bold font-mono uppercase tracking-widest text-foreground">AI ANALYSIS</p>
+                    <p className="mt-2 text-xs font-mono text-muted-foreground">Extract summary, themes, actions, and tags.</p>
                   </div>
-                  <button
-                    onClick={handleGenerateSummary}
-                    disabled={wordCount < 10}
-                    className="flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    <Sparkles size={13} />
-                    {wordCount < 10 ? 'Write more to unlock' : 'Generate Insight'}
+                  <button onClick={handleGenerateSummary} disabled={wordCount < 10} className="te-button-primary rounded px-4 py-2 text-[10px] font-bold font-mono uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 disabled:grayscale">
+                    <Radio size={12} /> {wordCount < 10 ? 'INSUFFICIENT DATA' : 'START ANALYSIS'}
                   </button>
-                </motion.div>
+                </div>
               )}
 
-              {/* Results */}
               {!isGeneratingSummary && summaryData && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-5"
-                >
-                  {/* Summary */}
+                <div className="space-y-6">
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Summary</p>
-                      <button
-                        onClick={handleCopySummary}
-                        title="Copy summary"
-                        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 transition-colors"
-                      >
-                        {copiedSummary ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                        {copiedSummary ? 'Copied' : 'Copy'}
+                      <p className="text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground">SUMMARY</p>
+                      <button onClick={handleCopySummary} className="flex items-center gap-1 rounded te-button px-1.5 py-0.5 text-[9px] font-bold font-mono uppercase text-muted-foreground">
+                        {copiedSummary ? <Check size={9} className="text-primary" /> : <Copy size={9} />}
+                        {copiedSummary ? 'COPIED' : 'COPY'}
                       </button>
                     </div>
-                    <p className="text-sm leading-relaxed text-gray-600 dark:text-zinc-400">
-                      {summaryData.summary}
-                    </p>
+                    <p className="text-sm font-sans leading-relaxed text-foreground bg-background p-3 rounded te-inset">{summaryData.summary}</p>
                   </div>
 
-                  {/* Themes */}
                   {summaryData.themes.length > 0 && (
                     <div>
-                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Key Themes</p>
+                      <p className="mb-2.5 text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground">THEMES</p>
                       <div className="flex flex-wrap gap-1.5">
                         {summaryData.themes.map((theme) => (
-                          <span
-                            key={theme}
-                            className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
-                          >
+                          <span key={theme} className="rounded te-inset bg-muted px-2 py-1 text-[9px] font-bold font-mono uppercase tracking-wider text-foreground border-none">
                             {theme}
                           </span>
                         ))}
@@ -1416,14 +1112,13 @@ Rules:
                     </div>
                   )}
 
-                  {/* Action items */}
                   {summaryData.actions.length > 0 && (
                     <div>
-                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Action Items</p>
+                      <p className="mb-2.5 text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground">ACTIONS</p>
                       <ul className="space-y-2">
                         {summaryData.actions.map((action, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600 dark:text-zinc-400">
-                            <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-400 dark:bg-indigo-500" />
+                          <li key={i} className="flex items-start gap-2 text-xs font-sans text-foreground">
+                            <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
                             {action}
                           </li>
                         ))}
@@ -1431,33 +1126,22 @@ Rules:
                     </div>
                   )}
 
-                  {/* Suggested tags */}
                   {summaryData.suggestedTags.length > 0 && (
                     <div>
-                      <p className="mb-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">Suggested Tags</p>
+                      <p className="mb-2.5 text-[9px] font-bold font-mono uppercase tracking-widest text-muted-foreground">SUGGESTED TAGS</p>
                       <div className="flex flex-wrap gap-1.5">
                         {summaryData.suggestedTags.map((tag) => {
                           const already = tags.includes(tag);
                           return (
-                            <button
-                              key={tag}
-                              onClick={() => !already && handleAddSuggestedTag(tag)}
-                              disabled={already}
-                              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${already
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 cursor-default'
-                                : 'border-gray-200 bg-white text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400'
-                                }`}
-                            >
-                              {already ? <Check size={10} /> : <Tag size={10} />}
-                              #{tag}
+                            <button key={tag} onClick={() => !already && handleAddSuggestedTag(tag)} disabled={already} className={`flex items-center gap-1 rounded px-2 py-1 text-[9px] font-bold font-mono uppercase tracking-wider transition-all ${already ? 'te-surface bg-muted text-muted-foreground' : 'te-button text-primary border-primary'}`}>
+                              {already ? <Check size={8} /> : <Tag size={8} />} #{tag}
                             </button>
                           );
                         })}
                       </div>
-                      <p className="mt-2 text-[11px] text-gray-400 dark:text-zinc-600">Click a tag to add it to your note</p>
                     </div>
                   )}
-                </motion.div>
+                </div>
               )}
             </div>
           </motion.div>
@@ -1469,7 +1153,7 @@ Rules:
 
 function ToolbarButton({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-white hover:text-gray-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100" title={label} aria-label={label}>
+    <button onClick={onClick} className="rounded p-1.5 text-muted-foreground te-button" title={label} aria-label={label}>
       {icon}
     </button>
   );
@@ -1477,9 +1161,9 @@ function ToolbarButton({ label, icon, onClick }: { label: string; icon: React.Re
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-gray-50 p-3 ring-1 ring-gray-100 dark:bg-zinc-900 dark:ring-zinc-800">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-bold text-gray-900 dark:text-zinc-100">{value}</p>
+    <div className="rounded border border-border te-inset bg-background p-2">
+      <p className="text-[8px] font-bold font-mono uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-bold font-mono text-foreground">{value}</p>
     </div>
   );
 }

@@ -30,9 +30,9 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: Array<{ id: SidebarView; label: string; icon: React.ReactNode }> = [
-  { id: 'notes', label: 'Notes', icon: <FileText size={16} /> },
-  { id: 'tasks', label: 'Tasks', icon: <CheckSquare size={16} /> },
-  { id: 'calendar', label: 'Calendar', icon: <CalendarDays size={16} /> },
+  { id: 'notes', label: 'NOTES', icon: <FileText size={15} /> },
+  { id: 'tasks', label: 'TASKS', icon: <CheckSquare size={15} /> },
+  { id: 'calendar', label: 'CALENDAR', icon: <CalendarDays size={15} /> },
 ];
 
 const container = {
@@ -84,55 +84,59 @@ export function Sidebar({
   const notesToRender = filteredNotes ?? unpinnedNotes;
 
   return (
-    <aside className="w-60 h-full bg-[#f7f7f5] dark:bg-zinc-950 border-r border-gray-200/60 dark:border-zinc-800 flex flex-col overflow-hidden">
+    <aside className="w-60 h-full bg-[#EDE8DC] dark:bg-[#1E1E1E] border-r border-[#D4CCBA] dark:border-[#333] flex flex-col overflow-hidden relative te-noise">
       {/* Logo + Command Button */}
-      <div className="flex h-14 items-center justify-between px-4">
-        <span className="text-[13px] font-bold tracking-widest text-gray-400 dark:text-zinc-500 uppercase select-none">
-          Notescape
-        </span>
+      <div className="relative z-10 flex h-14 items-center justify-between px-4 border-b border-[#D4CCBA] dark:border-[#333]">
+        <div className="flex items-center gap-2">
+          <div className="te-knob flex-shrink-0 hidden sm:block" aria-hidden />
+          <span className="font-mono text-[11px] font-bold tracking-[0.2em] text-[#6B6358] dark:text-[#8A8070] uppercase select-none te-emboss">
+            NOTESCAPE
+          </span>
+        </div>
         <button
           onClick={onOpenCommand}
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 dark:text-zinc-500 hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors text-[11px]"
+          className="flex items-center gap-1 px-2 py-1 rounded-md te-button text-[#8A8070] text-[10px] font-mono font-bold"
           title="Open Command Palette (Cmd+K)"
         >
-          <Command size={11} />
+          <Command size={10} />
           <span>K</span>
         </button>
       </div>
 
       {/* Search */}
-      <div className="px-3 mb-3">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-200/60 dark:bg-zinc-800 text-gray-400">
-          <Search size={13} className="flex-shrink-0" />
+      <div className="relative z-10 px-3 mb-3">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg te-inset">
+          <Search size={13} className="flex-shrink-0 text-[#B8AFA0] dark:text-[#555]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search..."
-            className="flex-1 bg-transparent text-xs text-gray-600 dark:text-gray-400 placeholder:text-gray-400 dark:placeholder:text-zinc-600 border-none outline-none"
+            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-[#B8AFA0] dark:placeholder:text-[#555] border-none outline-none font-mono"
           />
         </div>
       </div>
 
       {/* Nav */}
-      <div className="px-2 mb-4 flex flex-col gap-0.5 relative">
+      <div className="relative z-10 px-2 mb-4 flex flex-col gap-1">
         {NAV_ITEMS.map((nav) => {
           const isActive = activeView === nav.id;
           return (
             <button
               key={nav.id}
               onClick={() => { onChangeView(nav.id); setSelectedTag(null); }}
-              className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 z-10 ${
+              className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-mono font-bold tracking-wider transition-all duration-150 ${
                 isActive
-                  ? 'text-gray-900 dark:text-gray-100'
-                  : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200'
+                  ? 'text-[#FF6B35] te-surface'
+                  : 'text-[#8A8070] hover:text-foreground hover:bg-[#E8E2D6] dark:hover:bg-[#2A2A2A]'
               }`}
             >
+              {/* Orange active indicator bar */}
               {isActive && (
                 <motion.div
-                  layoutId="sidebar-active-pill"
-                  className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  layoutId="sidebar-active-bar"
+                  className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-full bg-[#FF6B35]"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
                 />
               )}
               {nav.icon}
@@ -144,16 +148,16 @@ export function Sidebar({
 
       {/* Tags */}
       {activeView === 'notes' && allTags.length > 0 && (
-        <div className="px-4 mb-4">
+        <div className="relative z-10 px-4 mb-4">
           <div className="flex flex-wrap gap-1.5">
             {allTags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors border ${
+                className={`px-2 py-0.5 rounded te-button text-[10px] font-mono font-bold tracking-wider transition-all ${
                   selectedTag === tag
-                    ? 'bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-100'
-                    : 'bg-transparent text-gray-500 border-gray-200 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-[#FF6B35] !text-white !border-[#D04E20]'
+                    : 'text-[#8A8070]'
                 }`}
               >
                 #{tag}
@@ -166,20 +170,20 @@ export function Sidebar({
       {/* Notes List */}
       {activeView === 'notes' && (
         <>
-          <div className="flex items-center justify-between px-4 mb-2">
-            <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
-              {searchQuery ? 'Results' : 'Notes'}
+          <div className="relative z-10 flex items-center justify-between px-4 mb-2">
+            <span className="te-label">
+              {searchQuery ? 'RESULTS' : 'NOTES'}
             </span>
             <button
               onClick={onCreateNote}
-              className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+              className="p-1.5 rounded-md te-button text-[#8A8070] hover:text-[#FF6B35] transition-colors"
               aria-label="New note"
             >
-              <Plus size={14} />
+              <Plus size={13} />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 pb-4">
+          <div className="relative z-10 flex-1 overflow-y-auto px-2 pb-4">
             <motion.div
               className="flex flex-col gap-0.5"
               variants={container}
@@ -190,9 +194,9 @@ export function Sidebar({
               {/* Pinned */}
               {!searchQuery && pinnedNotes.length > 0 && (
                 <>
-                  <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-semibold text-gray-400 dark:text-zinc-600 uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 px-3 py-1 te-label">
                     <Pin size={9} />
-                    Pinned
+                    PINNED
                   </div>
                   {pinnedNotes.map((note) => (
                     <NoteLink
@@ -202,7 +206,7 @@ export function Sidebar({
                       onClick={() => onSelectNote(note)}
                     />
                   ))}
-                  <div className="h-px bg-gray-200/80 dark:bg-zinc-800 mx-3 my-1" />
+                  <div className="te-divider mx-3 my-1" />
                 </>
               )}
 
@@ -217,7 +221,7 @@ export function Sidebar({
               ))}
 
               {notesToRender.length === 0 && (
-                <p className="px-3 py-6 text-xs text-gray-400 text-center">
+                <p className="px-3 py-6 text-xs text-[#B8AFA0] text-center font-mono">
                   {searchQuery ? 'No notes found' : 'No notes yet'}
                 </p>
               )}
@@ -230,12 +234,12 @@ export function Sidebar({
 
       {/* User Profile Section */}
       {user && (
-        <div 
+        <div
           onClick={onOpenSettings}
-          className="px-3 py-2 border-t border-gray-200/60 dark:border-zinc-800 flex items-center justify-between gap-2 bg-gray-50/50 dark:bg-zinc-900/10 hover:bg-gray-200/50 dark:hover:bg-zinc-900/40 cursor-pointer transition-colors duration-150"
+          className="relative z-10 px-3 py-2 border-t border-[#D4CCBA] dark:border-[#333] flex items-center justify-between gap-2 hover:bg-[#E8E2D6] dark:hover:bg-[#2A2A2A] cursor-pointer transition-colors duration-150"
         >
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-full bg-zinc-950 dark:bg-zinc-100 border border-zinc-200/10 flex items-center justify-center text-zinc-100 dark:text-zinc-950 text-[10px] font-semibold select-none flex-shrink-0 overflow-hidden">
+            <div className="w-7 h-7 rounded-full te-inset flex items-center justify-center text-[10px] font-mono font-bold select-none flex-shrink-0 overflow-hidden text-[#8A8070]">
               {user?.user_metadata?.avatar_url ? (
                 <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
@@ -243,17 +247,17 @@ export function Sidebar({
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-medium text-gray-700 dark:text-zinc-200 truncate">
+              <span className="text-[11px] font-semibold text-foreground truncate">
                 {userName}
               </span>
-              <span className="text-[9px] text-gray-400 dark:text-zinc-500 truncate">
+              <span className="text-[9px] font-mono text-[#B8AFA0] dark:text-[#555] truncate">
                 {userEmail}
               </span>
             </div>
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); signOut(); }}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 hover:bg-gray-200/60 dark:hover:bg-zinc-900 transition-all active:scale-95"
+            className="p-1 rounded-md te-button text-[#B8AFA0] hover:text-[#DC2626] transition-all active:scale-95"
             title="Sign Out"
           >
             <LogOut size={12} />
@@ -262,10 +266,19 @@ export function Sidebar({
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200/60 dark:border-zinc-800">
-        <span className="text-[10px] font-medium text-gray-400 dark:text-zinc-600">
-          {notes.length} notes
-        </span>
+      <div className="relative z-10 flex items-center justify-between px-4 py-3 border-t border-[#D4CCBA] dark:border-[#333]">
+        <div className="flex items-center gap-2">
+          <span className="te-label">{notes.length}</span>
+          {/* Mini VU-meter bar */}
+          <div className="w-12 h-1.5 rounded-full bg-[#E8E2D6] dark:bg-[#333] overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-[#FF6B35]"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(notes.length * 10, 100)}%` }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+            />
+          </div>
+        </div>
         <ThemeToggle />
       </div>
     </aside>
@@ -281,27 +294,24 @@ function NoteLink({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const COLOR_HEX: Record<string, string> = {
-    alabaster: '#F9F9F6', sage: '#EEF2EE', linen: '#FDF8F5',
-    slate: '#F0F1F4', lavender: '#F3EFFF',
-  };
-  const dotColor = COLOR_HEX[note.color] ?? '#e5e7eb';
-
   return (
     <motion.button
       variants={item}
       onClick={onClick}
       className={`flex w-full items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 ${
         isSelected
-          ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 shadow-sm'
-          : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900/60 hover:text-gray-700 dark:hover:text-zinc-200'
+          ? 'te-surface text-foreground'
+          : 'text-[#8A8070] hover:bg-[#E8E2D6] dark:hover:bg-[#2A2A2A] hover:text-foreground'
       }`}
     >
-      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-black/5" style={{ backgroundColor: dotColor }} />
+      {/* Orange dot indicator for selected */}
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+        isSelected ? 'bg-[#FF6B35] shadow-[0_0_6px_rgba(255,107,53,0.4)]' : 'bg-[#D4CCBA] dark:bg-[#3A3A3A]'
+      }`} />
       <span className="flex-1 text-xs font-medium truncate">
         {note.title || 'Untitled'}
       </span>
-      {note.pinned && <Pin size={9} className="flex-shrink-0 text-gray-400" />}
+      {note.pinned && <Pin size={9} className="flex-shrink-0 text-[#B8AFA0]" />}
     </motion.button>
   );
 }
